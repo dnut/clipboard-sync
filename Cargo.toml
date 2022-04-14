@@ -1,0 +1,23 @@
+[package]
+name = "wayland-clipboard-sync"
+version = "0.1.0"
+edition = "2021"
+
+
+[features]
+backtrace = []
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wayland-client = "0.29.4"
+# wl-clipboard-rs = { path = "../wl-clipboard-rs" } #"0.6.0"
+# wl-clipboard-rs = "0.4.1"
+wl-clipboard-rs = { git = "https://github.com/dnut/wl-clipboard-rs", branch = "reap-zombie-cat" }
+cli-clipboard = "0.2.0"
+arboard = "2.0.0"
+x11-clipboard = "0.5.3"
+terminal-clipboard = "0.3.1"
+nix = "0.23.1"
+anyhow = "1.0.44"
+thiserror = "1.0"
