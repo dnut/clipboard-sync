@@ -9,7 +9,7 @@ This hasn't been made into an easily installable package yet. Here are some step
 ```bash
 git clone git@github.com:dnut/wayland-clipboard-sync.git
 cd wayland-clipboard-sync
-sed -i "s_root=/home/drew/mine/code/wayland-clipboard-sync_root=$(pwd)_g"
+sed -i "s_root=/home/drew/mine/code/wayland-clipboard-sync_root=$(pwd)_g" daemon.sh
 echo "alias clipsync='$(pwd)/daemon.sh'" >> ~/.bashrc
 . ~/.bashrc
 ```
