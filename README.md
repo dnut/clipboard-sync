@@ -13,4 +13,4 @@ sed -i "s_root=/home/drew/mine/code/wayland-clipboard-sync_root=$(pwd)_g" daemon
 echo "alias clipsync='$(pwd)/daemon.sh'" >> ~/.bashrc
 . ~/.bashrc
 ```
-Then you can run `clipsync` at any time to start the service. Use `git pull` in the repo root to update.
+Then you can run `clipsync` at any time to start the service. The service runs in tmux so you can use `tmux attach` to find its output. Use `git pull` in the repo root to update.
