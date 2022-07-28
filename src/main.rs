@@ -14,9 +14,9 @@ mod error;
 fn main() {
     println!("starting clipboard sync");
     loop_with_error_pain_management(
-        get_clipboards(10),
+        get_clipboards(), //
         |cb| keep_synced(cb),
-        |_| get_clipboards(10),
+        |_| get_clipboards(),
     )
     .unwrap();
 }
@@ -85,9 +85,9 @@ fn loop_with_error_pain_management<
     }
 }
 
-fn get_clipboards(max: u8) -> Vec<Box<dyn Clipboard>> {
+fn get_clipboards() -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
-    for i in 0..max {
+    for i in 0..u8::MAX {
         let result = get_clipboard(i);
         match result {
             Ok(option) => match option {
@@ -95,9 +95,7 @@ fn get_clipboards(max: u8) -> Vec<Box<dyn Clipboard>> {
                     println!("Using clipboard: {:?}", clipboard);
                     clipboards.push(clipboard);
                 }
-                None => {
-                    println!("No display found at wayland-{}", i);
-                }
+                None => (),
             },
             Err(err) => eprintln!(
                 "unexpected error while attempting to setup clipboard {}: {}",
@@ -138,6 +136,9 @@ fn get_clipboard(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
 }
 
 fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
+    if clipboards.len() == 0 {
+        return Err(MyError::NoClipboards);
+    }
     let start = clipboards
         .iter()
         .map(|c| c.get().unwrap_or("".to_string()))
@@ -160,7 +161,6 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
     loop {
         for c in clipboards {
             let new = c.get()?;
-            // println!("{}: '{}' ", c.display(), new);
             if new != start {
                 println!("{}: old '{}' new '{}' ", c.display(), start, new);
                 return Ok(new);

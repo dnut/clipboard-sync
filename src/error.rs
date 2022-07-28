@@ -22,6 +22,9 @@ pub enum MyError {
 
     #[error("{0}")]
     Arboard(#[from] arboard::Error),
+
+    #[error("No clipboards.")]
+    NoClipboards,
 }
 
 #[derive(Debug)]
