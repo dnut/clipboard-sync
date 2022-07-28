@@ -198,7 +198,7 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
         for c in clipboards {
             let new = c.get()?;
             if new != start {
-                log!("{}: old '{}' new '{}' ", c.display(), start, new);
+                log!("clipboard updated from display {}", c.display());
                 return Ok(new);
             }
         }
