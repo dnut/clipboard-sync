@@ -1,6 +1,7 @@
 use chrono::Local;
 use error::{Generify, MyError, MyResult, Standardize};
 use nix::sys::signal::{Signal, self};
+use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use nix::unistd::{fork, Pid};
 use nix::{sys::wait::waitpid, unistd::ForkResult};
 use std::thread;
@@ -38,8 +39,10 @@ fn main() {
 pub fn kill_after(pid: Pid, seconds: u64) {
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(seconds));
-        log!("killing subprocess");
-        signal::kill(pid, Signal::SIGTERM).unwrap();
+        if let Ok(WaitStatus::StillAlive) = waitpid(Some(pid), Some(WaitPidFlag::WNOWAIT)) {
+            log!("killing subprocess {pid}");
+            signal::kill(pid, Signal::SIGTERM).unwrap();
+        }
     });
 }
 
