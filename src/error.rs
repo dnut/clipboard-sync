@@ -1,3 +1,4 @@
+use std::cell::{BorrowError, BorrowMutError};
 use std::error::Error as StdError;
 use std::fmt::{Debug, Display};
 
@@ -25,6 +26,12 @@ pub enum MyError {
 
     #[error("No clipboards.")]
     NoClipboards,
+
+    #[error("{0}")]
+    BorrowError(#[from] BorrowError),
+
+    #[error("{0}")]
+    BorrowMutError(#[from] BorrowMutError),
 }
 
 #[derive(Debug)]

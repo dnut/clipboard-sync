@@ -1,9 +1,10 @@
 use chrono::Local;
 use error::{Generify, MyError, MyResult, Standardize};
-use nix::sys::signal::{Signal, self};
+use nix::sys::signal::{self, Signal};
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use nix::unistd::{fork, Pid};
 use nix::{sys::wait::waitpid, unistd::ForkResult};
+use std::cell::RefCell;
 use std::thread;
 use std::time::SystemTime;
 use std::{env, io::Read, process::Command, thread::sleep, time::Duration};
@@ -135,7 +136,8 @@ fn get_clipboards() -> Vec<Box<dyn Clipboard>> {
             },
             Err(err) => elog!(
                 "unexpected error while attempting to setup clipboard {}: {}",
-                i, err
+                i,
+                err
             ),
         }
     }
@@ -160,11 +162,7 @@ fn get_clipboard(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
         version: 1,
     })) = attempt
     {
-        return Ok(Some(Box::new(HybridClipboard {
-            display: format!(":{}", n),
-            wayland_display: wl_display,
-            backend: terminal_clipboard::X11Clipboard::new().unwrap(),
-        })));
+        return Ok(Some(Box::new(HybridClipboard::gnome(n)?)));
     }
     attempt?;
 
@@ -332,9 +330,28 @@ impl Clipboard for ArClipboard {
     }
 }
 
-#[derive(Debug)]
 struct X11Clipboard {
     display: String,
+    backend: RefCell<terminal_clipboard::X11Clipboard>,
+}
+
+impl std::fmt::Debug for X11Clipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HybridClipboard")
+            .field("display", &self.display)
+            .finish()
+    }
+}
+
+impl X11Clipboard {
+    fn new(display: String) -> MyResult<Self> {
+        let cb = terminal_clipboard::X11Clipboard::new().standardize()?;
+
+        Ok(Self {
+            display,
+            backend: RefCell::new(cb),
+        })
+    }
 }
 
 impl Clipboard for X11Clipboard {
@@ -344,50 +361,45 @@ impl Clipboard for X11Clipboard {
 
     fn get(&self) -> MyResult<String> {
         env::set_var("DISPLAY", self.display.clone());
-        let clipboard = terminal_clipboard::X11Clipboard::new().standardize()?;
-        Ok(clipboard.get_string().unwrap_or("".to_string()))
+        Ok(self.backend.try_borrow()?.get_string().unwrap_or("".to_string()))
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("DISPLAY", self.display.clone());
-        let mut clipboard = terminal_clipboard::X11Clipboard::new().standardize()?;
-        clipboard.set_string(value.into()).standardize()?;
+        self.backend.try_borrow_mut()?.set_string(value.into()).standardize()?;
 
         Ok(())
     }
 }
 
-struct HybridClipboard {
-    display: String,
-    wayland_display: String,
-    backend: terminal_clipboard::X11Clipboard,
+#[derive(Debug)]
+struct HybridClipboard<G: Clipboard, S: Clipboard> {
+    getter: G,
+    setter: S,
 }
 
-impl std::fmt::Debug for HybridClipboard {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HybridClipboard")
-            .field("display", &self.display)
-            .field("wayland_display", &self.wayland_display)
-            .finish()
+impl HybridClipboard<X11Clipboard, CommandClipboard> {
+    fn gnome(n: u8) -> MyResult<Self> {
+        Ok(Self {
+            getter: X11Clipboard::new(format!(":{}", n))?,
+            setter: CommandClipboard {
+                display: format!("wayland-{}", n),
+            },
+        })
     }
 }
 
-impl Clipboard for HybridClipboard {
+impl<G: Clipboard, S: Clipboard> Clipboard for HybridClipboard<G, S> {
     fn display(&self) -> String {
-        self.display.clone()
+        self.getter.display()
     }
 
     fn get(&self) -> MyResult<String> {
-        env::set_var("DISPLAY", self.display.clone());
-        // let clipboard = terminal_clipboard::X11Clipboard::new().unwrap();
-        Ok(self.backend.get_string().unwrap_or("".to_string()))
+        self.getter.get()
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
-        env::set_var("WAYLAND_DISPLAY", self.wayland_display.clone());
-        Command::new("wl-copy").arg(value).spawn()?;
-
-        Ok(())
+        self.setter.set(value)
     }
 }
 
