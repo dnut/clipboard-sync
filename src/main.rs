@@ -1,4 +1,9 @@
+use chrono::Local;
 use error::{Generify, MyError, MyResult, Standardize};
+use nix::sys::signal::{Signal, self};
+use nix::unistd::{fork, Pid};
+use nix::{sys::wait::waitpid, unistd::ForkResult};
+use std::thread;
 use std::time::SystemTime;
 use std::{env, io::Read, process::Command, thread::sleep, time::Duration};
 use terminal_clipboard::Clipboard as TerminalClipboard;
@@ -12,7 +17,34 @@ mod error;
 // mod zombies;
 
 fn main() {
-    println!("starting clipboard sync");
+    let mut c = 0;
+    loop {
+        match unsafe { fork() }.expect("Failed to fork") {
+            ForkResult::Parent { child } => {
+                if c == 0 {
+                    log!("started clipboard sync manager");
+                }
+                kill_after(child, 600);
+                let status = waitpid(Some(child), None);
+                log!("child process completed with: {:?}", status);
+                sleep(Duration::from_secs(1));
+                c += 1;
+            }
+            ForkResult::Child => run(),
+        }
+    }
+}
+
+pub fn kill_after(pid: Pid, seconds: u64) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(seconds));
+        log!("killing subprocess");
+        signal::kill(pid, Signal::SIGTERM).unwrap();
+    });
+}
+
+fn run() {
+    log!("starting clipboard sync");
     loop_with_error_pain_management(
         get_clipboards(), //
         |cb| keep_synced(cb),
@@ -47,7 +79,7 @@ fn loop_with_error_pain_management<
         match action(&input) {
             Ok(ret) => return Ok(ret),
             Err(err) => {
-                eprintln!("keep_synced exited with error: {:?}", err);
+                elog!("action exited with error: {:?}", err);
                 let now = SystemTime::now();
                 input = recovery(input);
                 if errorcount == 0 {
@@ -82,6 +114,7 @@ fn loop_with_error_pain_management<
                 sleep(Duration::from_millis(1000));
             }
         }
+        log!("retrying");
     }
 }
 
@@ -92,12 +125,12 @@ fn get_clipboards() -> Vec<Box<dyn Clipboard>> {
         match result {
             Ok(option) => match option {
                 Some(clipboard) => {
-                    println!("Using clipboard: {:?}", clipboard);
+                    log!("Using clipboard: {:?}", clipboard);
                     clipboards.push(clipboard);
                 }
                 None => (),
             },
-            Err(err) => eprintln!(
+            Err(err) => elog!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i, err
             ),
@@ -162,7 +195,7 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
         for c in clipboards {
             let new = c.get()?;
             if new != start {
-                println!("{}: old '{}' new '{}' ", c.display(), start, new);
+                log!("{}: old '{}' new '{}' ", c.display(), start, new);
                 return Ok(new);
             }
         }
@@ -355,9 +388,25 @@ impl Clipboard for HybridClipboard {
     }
 }
 
+macro_rules! log {
+    ($($arg:tt)*) => {{
+        let s = format!($($arg)*);
+        println!("{} - {}", Local::now().format("%Y-%m-%d %H:%M:%S"), s);
+    }};
+}
+use log;
+
+macro_rules! elog {
+    ($($arg:tt)*) => {{
+        let s = format!($($arg)*);
+        eprintln!("{} - {}", Local::now().format("%Y-%m-%d %H:%M:%S"), s);
+    }};
+}
+use elog;
+
 #[test]
 fn test() {
-    println!("{:?}", get_clipboard(0).unwrap());
-    println!("{:?}", get_clipboard(1).unwrap());
-    println!("{:?}", get_clipboard(2).unwrap());
+    log!("{:?}", get_clipboard(0).unwrap());
+    log!("{:?}", get_clipboard(1).unwrap());
+    log!("{:?}", get_clipboard(2).unwrap());
 }
