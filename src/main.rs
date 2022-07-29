@@ -1,5 +1,6 @@
 use chrono::Local;
-use error::{Generify, MyError, MyResult, Standardize};
+use error::{Generify, MyError, MyResult, Standardize, StdIo};
+use itertools::Itertools;
 use nix::sys::signal::{self, Signal};
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use nix::unistd::{fork, Pid};
@@ -15,8 +16,10 @@ use wl_clipboard_rs::paste::{
     get_contents, ClipboardType, Error as PasteError, MimeType as PasteMimeType, Seat,
 };
 
+use crate::error::stdio;
+
 mod error;
-// mod zombies;
+mod log;
 
 fn main() {
     let mut c = 0;
@@ -24,11 +27,11 @@ fn main() {
         match unsafe { fork() }.expect("Failed to fork") {
             ForkResult::Parent { child } => {
                 if c == 0 {
-                    log!("started clipboard sync manager");
+                    log::info!("started clipboard sync manager");
                 }
                 kill_after(child, 600);
                 let status = waitpid(Some(child), None);
-                log!("child process completed with: {:?}", status);
+                log::info!("child process completed with: {:?}", status);
                 sleep(Duration::from_secs(1));
                 c += 1;
             }
@@ -41,18 +44,18 @@ pub fn kill_after(pid: Pid, seconds: u64) {
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(seconds));
         if let Ok(WaitStatus::StillAlive) = waitpid(Some(pid), Some(WaitPidFlag::WNOWAIT)) {
-            log!("killing subprocess {pid}");
+            log::info!("killing subprocess {pid}");
             signal::kill(pid, Signal::SIGTERM).unwrap();
         }
     });
 }
 
 fn run() {
-    log!("starting clipboard sync");
+    log::info!("starting clipboard sync");
     loop_with_error_pain_management(
-        get_clipboards(), //
+        get_clipboards().unwrap(), //
         |cb| keep_synced(cb),
-        |_| get_clipboards(),
+        |_| get_clipboards().unwrap(),
     )
     .unwrap();
 }
@@ -83,7 +86,7 @@ fn loop_with_error_pain_management<
         match action(&input) {
             Ok(ret) => return Ok(ret),
             Err(err) => {
-                elog!("action exited with error: {:?}", err);
+                log::error!("action exited with error: {:?}", err);
                 let now = SystemTime::now();
                 input = recovery(input);
                 if errorcount == 0 {
@@ -118,34 +121,87 @@ fn loop_with_error_pain_management<
                 sleep(Duration::from_millis(1000));
             }
         }
-        log!("retrying");
+        log::info!("retrying");
     }
 }
 
-fn get_clipboards() -> Vec<Box<dyn Clipboard>> {
+fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
+    let mut clipboards = get_clipboards_spec(get_wayland);
+    clipboards.extend(get_clipboards_spec(get_x11));
+
+    let mut remove_me = vec![];
+    for combo in clipboards.iter().enumerate().combinations(2) {
+        let (_, cb1) = combo[0];
+        let (i2, cb2) = combo[1];
+        if are_same(cb1, cb2)? {
+            log::debug!("{cb1:?} is the same as {cb2:?}, removing {cb2:?}");
+            remove_me.push(i2);
+        }
+    }
+    let clipboards = clipboards
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !remove_me.contains(i))
+        .map(|(_, c)| c)
+        .collect::<Vec<Box<dyn Clipboard>>>();
+
+    log::info!("Using clipboards: {:?}", clipboards);
+
+    Ok(clipboards)
+}
+
+fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool> {
+    let d1 = &one.display();
+    let d2 = &two.display();
+    one.set(d1)?;
+    if d1 != &two.get()? {
+        return Ok(false);
+    }
+    two.set(d2)?;
+    if d2 != &one.get()? {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+enum OptionIo<T> {
+    Some(T),
+    None,
+    StdIo(StdIo),
+}
+
+fn get_clipboards_spec<F: Fn(u8) -> MyResult<OptionIo<Box<dyn Clipboard>>>>(
+    getter: F,
+) -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
+    let mut combined_stdio = StdIo::default();
     for i in 0..u8::MAX {
-        let result = get_clipboard(i);
+        let result = getter(i);
         match result {
             Ok(option) => match option {
-                Some(clipboard) => {
-                    log!("Using clipboard: {:?}", clipboard);
+                OptionIo::Some(clipboard) => {
+                    log::debug!("Found clipboard: {:?}", clipboard);
                     clipboards.push(clipboard);
                 }
-                None => (),
+                OptionIo::None => (),
+                OptionIo::StdIo(stdio) => combined_stdio.extend(stdio),
             },
-            Err(err) => elog!(
+            Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i,
                 err
             ),
         }
     }
+    if combined_stdio != Default::default() {
+        log::truncate_to_debug!(log::error, "Got some unexpected output while locating clipboards, maybe you need to execute `xhost +localhost` in your x11 environments?: {:?}", combined_stdio);
+    }
 
     clipboards
 }
 
-fn get_clipboard(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
+fn get_wayland(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
     let wl_display = format!("wayland-{}", n);
     let clipboard = WlrClipboard {
         display: wl_display.clone(),
@@ -155,18 +211,32 @@ fn get_clipboard(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
         ConnectError::NoCompositorListening,
     ))) = attempt
     {
-        return Ok(None);
+        return Ok(OptionIo::None);
     }
     if let Err(MyError::WlcrsPaste(PasteError::MissingProtocol {
         name: "zwlr_data_control_manager_v1",
         version: 1,
     })) = attempt
     {
-        return Ok(Some(Box::new(HybridClipboard::gnome(n)?)));
+        log::error!("{wl_display} does not support zwlr_data_control_manager_v1, trying with X11Clipboard...");
+        return Ok(OptionIo::None);
     }
     attempt?;
 
-    Ok(Some(Box::new(clipboard)))
+    Ok(OptionIo::Some(Box::new(clipboard)))
+}
+
+fn get_x11(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
+    let display = format!(":{}", n);
+    let clipboard = X11Clipboard::new(display);
+    match clipboard {
+        Ok(clipboard) => {
+            clipboard.get()?;
+            Ok(OptionIo::Some(Box::new(clipboard)))
+        }
+        Err(MyError::TerminalClipboard(e)) => Ok(OptionIo::StdIo(e.stdio.unwrap_or_default())),
+        Err(e) => Err(e),
+    }
 }
 
 fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
@@ -196,7 +266,7 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
         for c in clipboards {
             let new = c.get()?;
             if new != start {
-                log!("clipboard updated from display {}", c.display());
+                log::info!("clipboard updated from display {}", c.display());
                 return Ok(new);
             }
         }
@@ -337,7 +407,7 @@ struct X11Clipboard {
 
 impl std::fmt::Debug for X11Clipboard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HybridClipboard")
+        f.debug_struct("X11Clipboard")
             .field("display", &self.display)
             .finish()
     }
@@ -345,7 +415,7 @@ impl std::fmt::Debug for X11Clipboard {
 
 impl X11Clipboard {
     fn new(display: String) -> MyResult<Self> {
-        let cb = terminal_clipboard::X11Clipboard::new().standardize()?;
+        let cb = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
 
         Ok(Self {
             display,
@@ -361,12 +431,19 @@ impl Clipboard for X11Clipboard {
 
     fn get(&self) -> MyResult<String> {
         env::set_var("DISPLAY", self.display.clone());
-        Ok(self.backend.try_borrow()?.get_string().unwrap_or("".to_string()))
+        Ok(self
+            .backend
+            .try_borrow()?
+            .get_string()
+            .unwrap_or("".to_string()))
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("DISPLAY", self.display.clone());
-        self.backend.try_borrow_mut()?.set_string(value.into()).standardize()?;
+        self.backend
+            .try_borrow_mut()?
+            .set_string(value.into())
+            .standardize()?;
 
         Ok(())
     }
@@ -378,16 +455,16 @@ struct HybridClipboard<G: Clipboard, S: Clipboard> {
     setter: S,
 }
 
-impl HybridClipboard<X11Clipboard, CommandClipboard> {
-    fn gnome(n: u8) -> MyResult<Self> {
-        Ok(Self {
-            getter: X11Clipboard::new(format!(":{}", n))?,
-            setter: CommandClipboard {
-                display: format!("wayland-{}", n),
-            },
-        })
-    }
-}
+// impl HybridClipboard<X11Clipboard, CommandClipboard> {
+//     fn gnome(n: u8) -> MyResult<Self> {
+//         Ok(Self {
+//             getter: X11Clipboard::new(format!(":{}", n))?,
+//             setter: CommandClipboard {
+//                 display: format!("wayland-{}", n),
+//             },
+//         })
+//     }
+// }
 
 impl<G: Clipboard, S: Clipboard> Clipboard for HybridClipboard<G, S> {
     fn display(&self) -> String {
@@ -403,25 +480,9 @@ impl<G: Clipboard, S: Clipboard> Clipboard for HybridClipboard<G, S> {
     }
 }
 
-macro_rules! log {
-    ($($arg:tt)*) => {{
-        let s = format!($($arg)*);
-        println!("{} - {}", Local::now().format("%Y-%m-%d %H:%M:%S"), s);
-    }};
-}
-use log;
-
-macro_rules! elog {
-    ($($arg:tt)*) => {{
-        let s = format!($($arg)*);
-        eprintln!("{} - {}", Local::now().format("%Y-%m-%d %H:%M:%S"), s);
-    }};
-}
-use elog;
-
-#[test]
-fn test() {
-    log!("{:?}", get_clipboard(0).unwrap());
-    log!("{:?}", get_clipboard(1).unwrap());
-    log!("{:?}", get_clipboard(2).unwrap());
-}
+// #[test]
+// fn test() {
+//     log::info!("{:?}", get_clipboard(0).unwrap());
+//     log::info!("{:?}", get_clipboard(1).unwrap());
+//     log::info!("{:?}", get_clipboard(2).unwrap());
+// }
