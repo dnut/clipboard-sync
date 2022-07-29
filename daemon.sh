@@ -1,12 +1,12 @@
 #!/bin/bash
 
-root=/home/drew/mine/code/wayland-clipboard-sync
+root=/home/drew/mine/code/clipboard-sync
 name=clipsync
 
 tmux new -s "$name" "
     bash --init-file <(echo '
         source ~/.bashrc
-        cd /home/drew/mine/code/wayland-clipboard-sync
+        cd /home/drew/mine/code/clipboard-sync
         ./run.sh
     ')
 " || (

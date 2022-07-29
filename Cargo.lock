@@ -184,6 +184,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "clipboard-sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "chrono",
+ "cli-clipboard",
+ "gag",
+ "itertools",
+ "nix 0.23.1",
+ "terminal-clipboard",
+ "thiserror",
+ "wayland-client 0.29.4",
+ "wl-clipboard-rs 0.6.0",
+ "x11-clipboard",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "4.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1311,24 +1329,6 @@ dependencies = [
  "wayland-commons 0.29.4",
  "wayland-scanner 0.29.4",
  "wayland-sys 0.29.4",
-]
-
-[[package]]
-name = "wayland-clipboard-sync"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "chrono",
- "cli-clipboard",
- "gag",
- "itertools",
- "nix 0.23.1",
- "terminal-clipboard",
- "thiserror",
- "wayland-client 0.29.4",
- "wl-clipboard-rs 0.6.0",
- "x11-clipboard",
 ]
 
 [[package]]
