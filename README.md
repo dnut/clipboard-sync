@@ -44,7 +44,7 @@ The typical set-and-forget approach is to enable to systemd service:
 systemctl --user enable --now clipboard-sync
 ```
 
-If you don't want it to run constantly, only on-demand, forget about systemd, and feel free to directly call the binary:
+If you don't want it to run constantly, only on-demand, don't use systemd. Directly call the binary as needed:
 ```bash
 clipboard-sync
 ```
