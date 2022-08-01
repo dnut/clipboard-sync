@@ -28,6 +28,7 @@ sudo make uninstall
 
 ### Cargo
 Install rust: https://www.rust-lang.org/tools/install
+
 This will only install the executable, not the service.
 ```bash
 cargo install --git https://github.com/dnut/clipboard-sync
