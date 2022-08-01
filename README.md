@@ -9,12 +9,41 @@ Nested wayland: You use gnome as your primary desktop environment, but you use a
 Multiple displays: You run x11 in one tty for games but otherwise use gnome in wayland.
 
 ## Installation
-This hasn't been made into an easily installable package yet. Here are some steps you could follow to get it easier to run:
+
+### Arch Linux
+coming soon...
+
+### Generic Linux
+Install rust: https://www.rust-lang.org/tools/install
 ```bash
-git clone git@github.com:dnut/clipboard-sync.git
+git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
-sed -i "s_root=/home/drew/mine/code/clipboard-sync_root=$(pwd)_g" daemon.sh
-echo "alias clipsync='$(pwd)/daemon.sh'" >> ~/.bashrc
-. ~/.bashrc
+make
+sudo make install
 ```
-Then you can run `clipsync` at any time to start the service. The service runs in tmux so you can use `tmux attach` to find its output. Use `git pull` in the repo root to update.
+Uninstall with:
+```bash
+sudo make uninstall
+```
+
+### Cargo
+Install rust: https://www.rust-lang.org/tools/install
+This will only install the executable, not the service.
+```bash
+cargo install --git https://github.com/dnut/clipboard-sync
+```
+Uninstall with:
+```bash
+cargo uninstall clipboard-sync
+```
+
+## Usage
+The typical set-and-forget approach is to enable to systemd service:
+```bash
+systemctl --user enable --now clipboard-sync
+```
+
+If you don't want it to run constantly, only on-demand, forget about systemd, and feel free to directly call the binary:
+```bash
+clipboard-sync
+```

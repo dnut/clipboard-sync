@@ -1,0 +1,13 @@
+[Unit]
+Description=Synchronize clipboards across all displays
+Documentation=https://github.com/dnut/clipboard-sync/
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/env clipboard-sync
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
