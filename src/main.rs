@@ -125,6 +125,12 @@ fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     let mut clipboards = get_clipboards_spec(get_wayland);
     clipboards.extend(get_clipboards_spec(get_x11));
 
+    let start = clipboards
+        .iter()
+        .map(|c| c.get().unwrap_or("".to_string()))
+        .find(|s| s != "")
+        .unwrap_or("".to_string());
+
     let mut remove_me = vec![];
     for combo in clipboards.iter().enumerate().combinations(2) {
         let (_, cb1) = combo[0];
@@ -140,6 +146,10 @@ fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
         .filter(|(i, _)| !remove_me.contains(i))
         .map(|(_, c)| c)
         .collect::<Vec<Box<dyn Clipboard>>>();
+
+    for c in clipboards.iter() {
+        c.set(&start)?;
+    }
 
     log::info!("Using clipboards: {:?}", clipboards);
 
@@ -238,20 +248,6 @@ fn get_x11(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
 fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
     if clipboards.len() == 0 {
         return Err(MyError::NoClipboards);
-    }
-    let start = "";
-    // there is some weird behavior where it seems that sway's wlr 
-    // implementation doesn't want to get after you set with its x11
-    // implementation with "are_same" so this doesn't work. also
-    // it's not really needed since all the clipboards are reset by
-    // that function anyway
-    // let start = clipboards
-    //     .iter()
-    //     .map(|c| c.get().unwrap_or("".to_string()))
-    //     .find(|s| s != "")
-    //     .unwrap_or("".to_string());
-    for c in clipboards {
-        c.set(&start)?;
     }
     loop {
         sleep(Duration::from_millis(100));
