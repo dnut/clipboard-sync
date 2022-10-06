@@ -11,9 +11,7 @@ backtrace = []
 
 [dependencies]
 wayland-client = "0.29.4"
-# wl-clipboard-rs = { path = "../wl-clipboard-rs" } #"0.6.0"
-# wl-clipboard-rs = "0.4.1"
-wl-clipboard-rs = { git = "https://github.com/dnut/wl-clipboard-rs", branch = "reap-zombie-cat" }
+wl-clipboard-rs = "0.7.0"
 cli-clipboard = "0.2.0"
 arboard = "2.0.0"
 x11-clipboard = "0.5.3"
