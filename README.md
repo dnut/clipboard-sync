@@ -13,7 +13,7 @@ Example use cases:
 If you want it installed system-wide or want the service to run automatically, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
 
 ### Arch Linux
-coming soon...
+[clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
 
 ### Generic Linux
 Install rust: https://www.rust-lang.org/tools/install
