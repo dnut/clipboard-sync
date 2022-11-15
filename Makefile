@@ -7,7 +7,7 @@ build:
 
 install:
 	install -Dm755 target/debug/clipboard-sync "$(prefix)/$(bin)/clipboard-sync"
-	install -Dm644 target/clipboard-sync.service "$(prefix)/$(systemd)/user/clipboard-sync.service"
+	install -Dm644 clipboard-sync.service "$(prefix)/$(systemd)/user/clipboard-sync.service"
 
 uninstall:
 	rm -f "$(prefix)/$(bin)/clipboard-sync"
