@@ -10,7 +10,7 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 ## Installation
-If you want it installed system-wide or you want the systemd service to run as a daemon, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
+If you want it installed system-wide or want the service to run automatically, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
 
 ### Arch Linux
 coming soon...
@@ -33,7 +33,7 @@ Install rust: https://www.rust-lang.org/tools/install
 
 This will only install the executable, not the service.
 ```bash
-cargo install --git https://github.com/dnut/clipboard-sync
+cargo install clipboard-sync
 ```
 Uninstall with:
 ```bash
@@ -41,7 +41,7 @@ cargo uninstall clipboard-sync
 ```
 
 ## Usage
-The typical set-and-forget approach is to enable to systemd service:
+The typical set-and-forget approach is to enable to service:
 ```bash
 systemctl --user enable --now clipboard-sync
 ```
