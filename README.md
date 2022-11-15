@@ -4,9 +4,10 @@ Synchronizes the clipboard across multiple X11 and wayland instances running on 
 
 Example use cases:
 
-Nested wayland: You use gnome as your primary desktop environment, but you use another wayland compositor, like sway, within a window to consoldiate all your messenger apps into a single tabbed window. If you want to copy and paste anything from your messenger apps in sway to the other apps in gnome (or vice versa), you'll need clipboard-sync to synchronize the sway and gnome clipboards.
-
-Multiple displays: You run x11 in one tty for games but otherwise use gnome in wayland.
+- **Multiple displays**: You run x11 in one tty for games but otherwise use gnome in wayland, switching between desktops using ctrl-alt-F*, and you want both displays to have a unified clipboard.
+- **Nested wayland**: You run a wayland compositor within a window. If you want to copy and paste anything from your primary desktop environment into the nested wayland window (or vice versa), you'll need clipboard-sync to synchronize the clipboards. examples:
+  - you primarily use kde, but run sway in a window to consoldiate all your messenger apps into a single tiled/tabbed window.
+  - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 ## Installation
 
