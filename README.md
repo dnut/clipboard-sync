@@ -10,15 +10,12 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 ## Installation
+If you want it installed system-wide or you want the systemd service to run as a daemon, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
 
 ### Arch Linux
 coming soon...
 
 ### Generic Linux
-Use this approach if:
-- there is no package for your linux distro.
-- you want to install the systemd units to run it as a daemon.
-
 Install rust: https://www.rust-lang.org/tools/install
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
@@ -32,10 +29,6 @@ sudo make uninstall
 ```
 
 ### Cargo
-Use this approach if:
-- there is no package for your linux distro.
-- you're happy to run clipboard-sync manually
-
 Install rust: https://www.rust-lang.org/tools/install
 
 This will only install the executable, not the service.
