@@ -9,7 +9,7 @@ Example use cases:
   - you primarily use kde, but run sway in a window to consoldiate all your messenger apps into a single tiled/tabbed window.
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
-## Installation
+# Installation
 If you want it installed system-wide or want the service to run automatically, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
 
 ### Arch Linux
@@ -40,7 +40,7 @@ Uninstall with:
 cargo uninstall clipboard-sync
 ```
 
-## Usage
+# Usage
 The typical set-and-forget approach is to enable to service:
 ```bash
 systemctl --user enable --now clipboard-sync
