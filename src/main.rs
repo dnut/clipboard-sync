@@ -1,4 +1,5 @@
 use chrono::Local;
+use clap::Parser;
 use error::{Generify, MyResult, Standardize};
 use nix::sys::signal::{self, Signal};
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
@@ -7,12 +8,46 @@ use nix::{sys::wait::waitpid, unistd::ForkResult};
 use std::thread;
 use std::time::SystemTime;
 use std::{thread::sleep, time::Duration};
+
 mod clipboard;
 mod error;
 mod log;
+mod mustatex;
 mod sync;
 
+#[cfg(not(debug_assertions))]
 fn main() {
+    configure();
+    run_forked()
+}
+
+#[cfg(debug_assertions)]
+fn main() {
+    configure();
+    run()
+}
+
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    // / Name of the person to greet
+    #[arg(long, value_enum, default_value_t = log::Level::default())]
+    log_level: log::Level,
+
+    /// whether to include timestamps in the logs (systemd already includes timestamps so you'll want to disable this)
+    #[arg(long)]
+    log_timestamp: bool,
+}
+
+fn configure() {
+    let args = Args::parse();
+    log::level::set(args.log_level);
+    log::timestamp::set(args.log_timestamp);
+}
+
+#[allow(dead_code)]
+fn run_forked() {
     let mut c = 0;
     loop {
         match unsafe { fork() }.expect("Failed to fork") {
@@ -31,6 +66,16 @@ fn main() {
     }
 }
 
+fn run() {
+    log::info!("starting clipboard sync");
+    loop_with_error_pain_management(
+        sync::get_clipboards().unwrap(),
+        |cb| sync::keep_synced(cb),
+        |_| sync::get_clipboards().unwrap(),
+    )
+    .unwrap();
+}
+
 pub fn kill_after(pid: Pid, seconds: u64) {
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(seconds));
@@ -39,16 +84,6 @@ pub fn kill_after(pid: Pid, seconds: u64) {
             signal::kill(pid, Signal::SIGTERM).unwrap();
         }
     });
-}
-
-fn run() {
-    log::info!("starting clipboard sync");
-    loop_with_error_pain_management(
-        sync::get_clipboards().unwrap(), //
-        |cb| sync::keep_synced(cb),
-        |_| sync::get_clipboards().unwrap(),
-    )
-    .unwrap();
 }
 
 /// Execute an action with a sophistocated retry mechanism
@@ -82,29 +117,27 @@ fn loop_with_error_pain_management<
                 input = recovery(input);
                 if errorcount == 0 {
                     first_error = now;
+                } else if SystemTime::now().duration_since(last_error).unwrap()
+                    > Duration::from_secs(10)
+                {
+                    errorcount = 0;
                 } else {
-                    if SystemTime::now().duration_since(last_error).unwrap()
-                        > Duration::from_secs(10)
-                    {
-                        errorcount = 0;
-                    } else {
-                        let error_session_seconds = SystemTime::now()
-                            .duration_since(first_error)
-                            .unwrap()
-                            .as_secs();
-                        let error_session_rate_scaled = errorcount
-                            .checked_mul(100)
-                            .unwrap_or(u64::MAX)
-                            .checked_div(error_session_seconds)
-                            .unwrap_or(u64::MAX);
-                        let error_pain = error_session_rate_scaled
-                            .checked_add(error_session_seconds)
-                            .unwrap_or(u64::MAX);
-                        if error_pain > 100 {
-                            Err(format!("too many errors, exiting"))
-                                .standardize()
-                                .generify()?;
-                        }
+                    let error_session_seconds = SystemTime::now()
+                        .duration_since(first_error)
+                        .unwrap()
+                        .as_secs();
+                    let error_session_rate_scaled = errorcount
+                        .checked_mul(100)
+                        .unwrap_or(u64::MAX)
+                        .checked_div(error_session_seconds)
+                        .unwrap_or(u64::MAX);
+                    let error_pain = error_session_rate_scaled
+                        .checked_add(error_session_seconds)
+                        .unwrap_or(u64::MAX);
+                    if error_pain > 100 {
+                        Err("too many errors, exiting".to_string())
+                            .standardize()
+                            .generify()?;
                     }
                 }
                 last_error = now;
