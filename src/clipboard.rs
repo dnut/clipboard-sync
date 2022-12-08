@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::{env, io::Read, process::Command, thread::sleep, time::Duration};
 use terminal_clipboard::Clipboard as TerminalClipboard;
 use wl_clipboard_rs::copy::{MimeType as CopyMimeType, Options, Source};
@@ -6,7 +7,7 @@ use wl_clipboard_rs::paste::{
     get_contents, ClipboardType, Error as PasteError, MimeType as PasteMimeType, Seat,
 };
 
-use crate::error::{stdio, Generify, MyResult, Standardize};
+use crate::error::{Generify, MyResult, Standardize};
 
 pub trait Clipboard: std::fmt::Debug {
     fn display(&self) -> String;
@@ -122,7 +123,7 @@ impl Clipboard for ArClipboard {
     fn get(&self) -> MyResult<String> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let mut clipboard = arboard::Clipboard::new()?;
-        Ok(clipboard.get_text().unwrap_or("".to_string()))
+        Ok(clipboard.get_text().unwrap_or_default())
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
@@ -136,7 +137,20 @@ impl Clipboard for ArClipboard {
 
 pub struct X11Clipboard {
     display: String,
-    backend: RefCell<terminal_clipboard::X11Clipboard>,
+    backend: X11Backend,
+}
+
+#[derive(Clone)]
+pub struct X11Backend(Rc<RefCell<terminal_clipboard::X11Clipboard>>);
+impl X11Backend {
+    /// try to only call this once because repeated initializations may not work.
+    /// i started seeing timeouts/errors after 4
+    pub fn new() -> MyResult<Self> {
+        // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
+        let backend = terminal_clipboard::X11Clipboard::new().unwrap();
+
+        Ok(Self(Rc::new(RefCell::new(backend))))
+    }
 }
 
 impl std::fmt::Debug for X11Clipboard {
@@ -148,13 +162,8 @@ impl std::fmt::Debug for X11Clipboard {
 }
 
 impl X11Clipboard {
-    pub fn new(display: String) -> MyResult<Self> {
-        let cb = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
-
-        Ok(Self {
-            display,
-            backend: RefCell::new(cb),
-        })
+    pub fn new(display: String, backend: X11Backend) -> Self {
+        Self { display, backend }
     }
 }
 
@@ -167,16 +176,18 @@ impl Clipboard for X11Clipboard {
         env::set_var("DISPLAY", self.display.clone());
         Ok(self
             .backend
+            .0
             .try_borrow()?
             .get_string()
-            .unwrap_or("".to_string()))
+            .unwrap_or_default())
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("DISPLAY", self.display.clone());
         self.backend
+            .0
             .try_borrow_mut()?
-            .set_string(value.into())
+            .set_string(value)
             .standardize()?;
 
         Ok(())

@@ -1,38 +1,47 @@
 use chrono::Local;
-use itertools::Itertools;
+use std::collections::{HashMap, HashSet};
 use std::{thread::sleep, time::Duration};
 use wayland_client::ConnectError;
 use wl_clipboard_rs::paste::Error as PasteError;
 
 use crate::clipboard::*;
-use crate::error::{MyError, MyResult, StdIo};
+use crate::error::{MyError, MyResult};
 use crate::log;
 
 pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
+    log::info!("identifying unique clipboards...");
     let mut clipboards = get_clipboards_spec(get_wayland);
-    clipboards.extend(get_clipboards_spec(get_x11));
+    let x11_backend = X11Backend::new()?;
+    clipboards.extend(get_clipboards_spec(|n| get_x11(x11_backend.clone(), n)));
 
     let start = clipboards
         .iter()
-        .map(|c| c.get().unwrap_or("".to_string()))
-        .find(|s| s != "")
-        .unwrap_or("".to_string());
+        .map(|c| c.get().unwrap_or_default())
+        .find(|s| s.is_empty())
+        .unwrap_or_default();
 
-    let mut remove_me = vec![];
-    for combo in clipboards.iter().enumerate().combinations(2) {
-        let (_, cb1) = combo[0];
-        let (i2, cb2) = combo[1];
-        if are_same(cb1, cb2)? {
-            log::debug!("{cb1:?} is the same as {cb2:?}, removing {cb2:?}");
-            remove_me.push(i2);
+    let mut remove_me = HashSet::new();
+    let len = clipboards.len();
+    for i in 0..clipboards.len() {
+        if !remove_me.contains(&i) {
+            let cb1 = &clipboards[i];
+            for (j, cb2) in clipboards.iter().enumerate().take(len).skip(i + 1) {
+                if are_same(cb1, cb2)? {
+                    log::debug!("{cb1:?} is the same as {cb2:?}, removing {cb2:?}");
+                    remove_me.insert(j);
+                }
+            }
         }
     }
+
     let clipboards = clipboards
         .into_iter()
         .enumerate()
         .filter(|(i, _)| !remove_me.contains(i))
         .map(|(_, c)| c)
         .collect::<Vec<Box<dyn Clipboard>>>();
+
+    // let clipboards = dedupe(clipboards)?;
 
     for c in clipboards.iter() {
         c.set(&start)?;
@@ -44,7 +53,7 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
 }
 
 pub fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
-    if clipboards.len() == 0 {
+    if clipboards.is_empty() {
         return Err(MyError::NoClipboards);
     }
     loop {
@@ -71,28 +80,91 @@ fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool
     Ok(true)
 }
 
-enum OptionIo<T> {
-    Some(T),
-    None,
-    StdIo(StdIo),
-}
+// /// equality comparison is the bottleneck, and it's composed of two steps. so
+// /// the purpose of this function is to minimize the number of executions of
+// /// those steps. to do so, these steps are run at different times and combined
+// /// at the end. this requires some extra computation in here but that's fine.
+// fn dedupe(clipboards: Vec<Box<dyn Clipboard>>) -> MyResult<Vec<Box<dyn Clipboard>>> {
+//     let mut k_cant_read_v: HashMap<usize, HashSet<usize>> = HashMap::new();
+//     let mut k_can_read_v: HashMap<usize, HashSet<usize>> = HashMap::new();
+//     for (i, one) in clipboards.iter().enumerate() {
+//         // let i_can_read = k_can_read_v.entry(i).or_insert(HashSet::new()).clone();
+//         let i_cant_read = k_cant_read_v.entry(i).or_insert(HashSet::new()).clone();
+//         let d1 = &one.display();
+//         one.set(d1)?;
+//         for (j, two) in clipboards.iter().enumerate() {
+//             println!("{i} {j} {} {}", i != j, !i_cant_read.contains(&j));
+//             if i != j && !i_cant_read.contains(&j) {
+//                 if d1 == &two.get()? {
+//                     log::debug!("{two:?} can read {one:?}");
+//                     k_can_read_v.entry(j).or_insert(HashSet::new()).insert(i);
+//                 } else {
+//                     log::debug!("{two:?} cannot read {one:?}");
+//                     k_cant_read_v.entry(j).or_insert(HashSet::new()).insert(i);
+//                 }
+//             }
+//         }
+//     }
+//     let mut remove_me: HashSet<usize> = HashSet::new();
+//     let mut dont_remove_me: HashSet<usize> = HashSet::new();
+//     println!("{k_cant_read_v:#?}");
+//     println!("{k_can_read_v:#?}");
+//     for (k, v) in k_can_read_v.iter() {
+//         for readable in v {
+//             if !dont_remove_me.contains(readable)
+//                 && k_can_read_v
+//                     .get(readable)
+//                     .map(|what_readable_can_read| what_readable_can_read.contains(k))
+//                     .unwrap_or(false)
+//             {
+//                 remove_me.insert(*readable);
+//                 dont_remove_me.insert(*k);
+//             }
+//         }
+//     }
 
-fn get_clipboards_spec<F: Fn(u8) -> MyResult<OptionIo<Box<dyn Clipboard>>>>(
+//     Ok(clipboards
+//         .into_iter()
+//         .enumerate()
+//         .filter(|(i, _)| !remove_me.contains(i))
+//         .map(|(_, c)| c)
+//         .collect::<Vec<Box<dyn Clipboard>>>())
+// }
+
+
+// /// equality comparison is the bottleneck, and it's composed of two steps. so
+// /// the purpose of this function is to minimize the number of executions of
+// /// those steps. to do so, these steps are run at different times and combined
+// /// at the end. this requires some extra computation in here but that's fine.
+// fn dedupe(clipboards: Vec<Box<dyn Clipboard>>) -> MyResult<Vec<Box<dyn Clipboard>>> {
+//     for (i, clipboard) in clipboards.iter().enumerate() {
+//         println!("write {i}");
+//         clipboard.set(&format!("{}{i}", clipboard.get()?))?;
+//     }
+//     let mut results = HashMap::new();
+//     for (i, clipboard) in clipboards.iter().enumerate() {
+//         println!("read {i}");
+//         results.insert(i, clipboard.get()?);
+//     }
+
+//     todo!()
+// }
+
+fn check_in_thread() {}
+
+fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
     getter: F,
 ) -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
-    let mut combined_stdio = StdIo::default();
-    for i in 0..u8::MAX {
+    for i in 0..20 {
         let result = getter(i);
         match result {
-            Ok(option) => match option {
-                OptionIo::Some(clipboard) => {
+            Ok(option) => {
+                if let Some(clipboard) = option {
                     log::debug!("Found clipboard: {:?}", clipboard);
                     clipboards.push(clipboard);
                 }
-                OptionIo::None => (),
-                OptionIo::StdIo(stdio) => combined_stdio.extend(stdio),
-            },
+            }
             Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i,
@@ -100,14 +172,11 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<OptionIo<Box<dyn Clipboard>>>>(
             ),
         }
     }
-    if combined_stdio != Default::default() {
-        log::truncate_to_debug!(log::error, "Got some unexpected output while locating clipboards, maybe you need to execute `xhost +localhost` in your x11 environments?: {:?}", combined_stdio);
-    }
 
     clipboards
 }
 
-fn get_wayland(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
+fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let wl_display = format!("wayland-{}", n);
     let clipboard = WlrClipboard {
         display: wl_display.clone(),
@@ -117,32 +186,27 @@ fn get_wayland(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
         ConnectError::NoCompositorListening,
     ))) = attempt
     {
-        return Ok(OptionIo::None);
+        return Ok(None);
     }
     if let Err(MyError::WlcrsPaste(PasteError::MissingProtocol {
         name: "zwlr_data_control_manager_v1",
         version: 1,
     })) = attempt
     {
-        log::error!("{wl_display} does not support zwlr_data_control_manager_v1, trying with X11Clipboard...");
-        return Ok(OptionIo::None);
+        log::warning!("{wl_display} does not support zwlr_data_control_manager_v1. If you are running gnome in wayland, that's OK because it provides an x11 clipboard, which will be used instead.");
+        return Ok(None);
     }
     attempt?;
 
-    Ok(OptionIo::Some(Box::new(clipboard)))
+    Ok(Some(Box::new(clipboard)))
 }
 
-fn get_x11(n: u8) -> MyResult<OptionIo<Box<dyn Clipboard>>> {
+fn get_x11(backend: X11Backend, n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let display = format!(":{}", n);
-    let clipboard = X11Clipboard::new(display);
-    match clipboard {
-        Ok(clipboard) => {
-            clipboard.get()?;
-            Ok(OptionIo::Some(Box::new(clipboard)))
-        }
-        Err(MyError::TerminalClipboard(e)) => Ok(OptionIo::StdIo(e.stdio.unwrap_or_default())),
-        Err(e) => Err(e),
-    }
+    let clipboard = X11Clipboard::new(display, backend);
+    clipboard.get()?;
+
+    Ok(Some(Box::new(clipboard)))
 }
 
 fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {

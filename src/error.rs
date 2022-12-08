@@ -56,7 +56,10 @@ impl<T, E: Sized + Debug> Standardize<T, E> for Result<T, E> {
     fn standardize(self) -> Result<T, StandardizedError<E>> {
         match self {
             Ok(ok) => Ok(ok),
-            Err(err) => Err(StandardizedError { inner: err, stdio: None }),
+            Err(err) => Err(StandardizedError {
+                inner: err,
+                stdio: None,
+            }),
         }
     }
 }
@@ -65,7 +68,10 @@ impl<T, E: Sized + Debug> Standardize<T, E> for (Result<T, E>, StdIo) {
     fn standardize(self) -> Result<T, StandardizedError<E>> {
         match self.0 {
             Ok(ok) => Ok(ok),
-            Err(err) => Err(StandardizedError { inner: err, stdio: Some(self.1) }),
+            Err(err) => Err(StandardizedError {
+                inner: err,
+                stdio: Some(self.1),
+            }),
         }
     }
 }
@@ -83,27 +89,30 @@ impl<T, E: 'static + StdError> Generify<T, E> for Result<T, E> {
     }
 }
 
+#[allow(unused)]
 macro_rules! stdio {
-	($block:expr) => {{
-		let mut stdout_redirect = gag::BufferRedirect::stdout().unwrap();
-		let mut stderr_redirect = gag::BufferRedirect::stderr().unwrap();
-		let ret = $block;
-		let mut stdout = String::new();
-		let mut stderr = String::new();
-		stdout_redirect.read_to_string(&mut stdout).unwrap();
-		stderr_redirect.read_to_string(&mut stderr).unwrap();
-		(ret, crate::error::StdIo { stdout, stderr })
-	}};
+    ($block:expr) => {{
+        let mut stdout_redirect = gag::BufferRedirect::stdout().unwrap();
+        let mut stderr_redirect = gag::BufferRedirect::stderr().unwrap();
+        let ret = $block;
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        stdout_redirect.read_to_string(&mut stdout).unwrap();
+        stderr_redirect.read_to_string(&mut stderr).unwrap();
+        (ret, crate::error::StdIo { stdout, stderr })
+    }};
 }
+#[allow(unused)]
 pub(crate) use stdio;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct StdIo {
-	pub stdout: String,
-	pub stderr: String,
+    pub stdout: String,
+    pub stderr: String,
 }
 
 impl StdIo {
+    #[allow(unused)]
     pub fn extend(&mut self, other: StdIo) {
         self.stdout = format!("{}{}", self.stdout, other.stdout);
         self.stderr = format!("{}{}", self.stderr, other.stderr);
