@@ -150,7 +150,6 @@ fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool
 //     todo!()
 // }
 
-fn check_in_thread() {}
 
 fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
     getter: F,
