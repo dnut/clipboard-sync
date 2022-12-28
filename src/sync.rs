@@ -1,18 +1,18 @@
 use chrono::Local;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::{thread::sleep, time::Duration};
 use wayland_client::ConnectError;
 use wl_clipboard_rs::paste::Error as PasteError;
 
 use crate::clipboard::*;
-use crate::error::{MyError, MyResult};
+use crate::error::{MyError, MyResult, StandardizedError};
 use crate::log;
 
 pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     log::info!("identifying unique clipboards...");
     let mut clipboards = get_clipboards_spec(get_wayland);
-    let x11_backend = X11Backend::new()?;
-    clipboards.extend(get_clipboards_spec(|n| get_x11(x11_backend.clone(), n)));
+    // let x11_backend = X11Backend::new()?;
+    clipboards.extend(get_clipboards_spec(get_x11));
 
     let start = clipboards
         .iter()
@@ -131,7 +131,6 @@ fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool
 //         .collect::<Vec<Box<dyn Clipboard>>>())
 // }
 
-
 // /// equality comparison is the bottleneck, and it's composed of two steps. so
 // /// the purpose of this function is to minimize the number of executions of
 // /// those steps. to do so, these steps are run at different times and combined
@@ -150,12 +149,11 @@ fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool
 //     todo!()
 // }
 
-
 fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
     getter: F,
 ) -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
-    for i in 0..20 {
+    for i in 0..u8::MAX {
         let result = getter(i);
         match result {
             Ok(option) => {
@@ -164,6 +162,12 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
                     clipboards.push(clipboard);
                 }
             }
+            Err(MyError::TerminalClipboard(StandardizedError {
+                inner,
+                stdio: None,
+            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => log::debug!(
+                "known issue connecting to x11 clipboard :{i}. typically this happens when you try to attach to a gnome clipboard using too many x11 clipboards: {inner}",
+            ),
             Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i,
@@ -200,9 +204,9 @@ fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     Ok(Some(Box::new(clipboard)))
 }
 
-fn get_x11(backend: X11Backend, n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
+fn get_x11(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let display = format!(":{}", n);
-    let clipboard = X11Clipboard::new(display, backend);
+    let clipboard = X11Clipboard::new(display)?;
     clipboard.get()?;
 
     Ok(Some(Box::new(clipboard)))

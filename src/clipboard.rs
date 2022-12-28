@@ -145,9 +145,19 @@ pub struct X11Backend(Rc<RefCell<terminal_clipboard::X11Clipboard>>);
 impl X11Backend {
     /// try to only call this once because repeated initializations may not work.
     /// i started seeing timeouts/errors after 4
-    pub fn new() -> MyResult<Self> {
+    pub fn new(display: u8) -> MyResult<Self> {
         // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
-        let backend = terminal_clipboard::X11Clipboard::new().unwrap();
+        env::set_var("DISPLAY", format!(":{display}"));
+        let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
+
+        Ok(Self(Rc::new(RefCell::new(backend))))
+    }
+    /// try to only call this once because repeated initializations may not work.
+    /// i started seeing timeouts/errors after 4
+    pub fn new_str(display: &str) -> MyResult<Self> {
+        // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
+        env::set_var("DISPLAY", display);
+        let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
 
         Ok(Self(Rc::new(RefCell::new(backend))))
     }
@@ -162,9 +172,16 @@ impl std::fmt::Debug for X11Clipboard {
 }
 
 impl X11Clipboard {
-    pub fn new(display: String, backend: X11Backend) -> Self {
-        Self { display, backend }
+    pub fn new(display: String) -> MyResult<Self> {
+        Ok(Self {
+            backend: X11Backend::new_str(&display)?,
+            display,
+        })
     }
+
+    // fn backend(&self) -> X11Backend {
+    //     X11Backend::new_str(&self.display).unwrap()
+    // }
 }
 
 impl Clipboard for X11Clipboard {
@@ -173,7 +190,7 @@ impl Clipboard for X11Clipboard {
     }
 
     fn get(&self) -> MyResult<String> {
-        env::set_var("DISPLAY", self.display.clone());
+        // env::set_var("DISPLAY", self.display.clone());
         Ok(self
             .backend
             .0
@@ -183,7 +200,7 @@ impl Clipboard for X11Clipboard {
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
-        env::set_var("DISPLAY", self.display.clone());
+        // env::set_var("DISPLAY", self.display.clone());
         self.backend
             .0
             .try_borrow_mut()?
