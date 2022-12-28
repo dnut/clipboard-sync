@@ -86,7 +86,7 @@ pub fn kill_after(pid: Pid, seconds: u64) {
     });
 }
 
-/// Execute an action with a sophistocated retry mechanism
+/// Execute an action with a sophisticated retry mechanism
 /// If the action fails:
 /// - 1. run a recovery step to manipulate the input
 /// - 2. attempt to execute the action again
