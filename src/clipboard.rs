@@ -1,5 +1,8 @@
+use async_trait::async_trait;
+use futures::Future;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::{env, io::Read, process::Command, thread::sleep, time::Duration};
 use terminal_clipboard::Clipboard as TerminalClipboard;
 use wl_clipboard_rs::copy::{MimeType as CopyMimeType, Options, Source};
@@ -7,16 +10,18 @@ use wl_clipboard_rs::paste::{
     get_contents, ClipboardType, Error as PasteError, MimeType as PasteMimeType, Seat,
 };
 
+use crate::asyncification::asyncify;
 use crate::error::{Generify, MyResult, Standardize};
 
+#[async_trait(?Send)]
 pub trait Clipboard: std::fmt::Debug {
     fn display(&self) -> String;
-    fn get(&self) -> MyResult<String>;
-    fn set(&self, value: &str) -> MyResult<()>;
-    fn watch(&self) -> MyResult<String> {
-        let start = self.get()?;
+    async fn get(&self) -> MyResult<String>;
+    async fn set(&self, value: &str) -> MyResult<()>;
+    async fn watch(&self) -> MyResult<String> {
+        let start = self.get().await?;
         loop {
-            let now = self.get()?;
+            let now = self.get().await?;
             if now != start {
                 return Ok(now);
             }
@@ -25,13 +30,14 @@ pub trait Clipboard: std::fmt::Debug {
     }
 }
 
+#[async_trait(?Send)]
 impl<T: Clipboard> Clipboard for Box<T> {
-    fn get(&self) -> MyResult<String> {
-        (**self).get()
+    async fn get(&self) -> MyResult<String> {
+        (**self).get().await
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
-        (**self).set(value)
+    async fn set(&self, value: &str) -> MyResult<()> {
+        (**self).set(value).await
     }
 
     fn display(&self) -> String {
@@ -39,17 +45,14 @@ impl<T: Clipboard> Clipboard for Box<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WlrClipboard {
     pub display: String,
 }
 
-impl Clipboard for WlrClipboard {
-    fn display(&self) -> String {
-        self.display.clone()
-    }
-
-    fn get(&self) -> MyResult<String> {
+impl WlrClipboard {
+    fn sync_get(&self) -> MyResult<String> {
+        println!("asdasd");
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let result = get_contents(
             ClipboardType::Regular,
@@ -72,7 +75,7 @@ impl Clipboard for WlrClipboard {
         }
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
+    fn sync_set(&self, value: &str) -> MyResult<()> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let opts = Options::new();
         let result = std::panic::catch_unwind(|| {
@@ -86,23 +89,44 @@ impl Clipboard for WlrClipboard {
     }
 }
 
+#[async_trait(?Send)]
+impl Clipboard for WlrClipboard {
+    fn display(&self) -> String {
+        self.display.clone()
+    }
+
+    async fn get(&self) -> MyResult<String> {
+        // let s = self.clone();
+        // asyncify(move || s.sync_get()).await
+        self.sync_get()
+    }
+
+    async fn set(&self, value: &str) -> MyResult<()> {
+        // let s = self.clone();
+        // let v = value.to_owned();
+        // asyncify(move || s.sync_set(&v)).await
+        self.sync_set(value)
+    }
+}
+
 #[derive(Debug)]
 pub struct CommandClipboard {
     display: String,
 }
 
+#[async_trait(?Send)]
 impl Clipboard for CommandClipboard {
     fn display(&self) -> String {
         self.display.clone()
     }
 
-    fn get(&self) -> MyResult<String> {
+    async fn get(&self) -> MyResult<String> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let out = Command::new("wl-paste").output()?.stdout;
         Ok(String::from_utf8_lossy(&out).trim().to_string())
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
+    async fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         Command::new("wl-copy").arg(value).spawn()?;
 
@@ -115,18 +139,19 @@ pub struct ArClipboard {
     display: String,
 }
 
+#[async_trait(?Send)]
 impl Clipboard for ArClipboard {
     fn display(&self) -> String {
         self.display.clone()
     }
 
-    fn get(&self) -> MyResult<String> {
+    async fn get(&self) -> MyResult<String> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let mut clipboard = arboard::Clipboard::new()?;
         Ok(clipboard.get_text().unwrap_or_default())
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
+    async fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("WAYLAND_DISPLAY", self.display.clone());
         let mut clipboard = arboard::Clipboard::new()?;
         clipboard.set_text(value.into())?;
@@ -167,12 +192,13 @@ impl X11Clipboard {
     }
 }
 
+#[async_trait(?Send)]
 impl Clipboard for X11Clipboard {
     fn display(&self) -> String {
         self.display.clone()
     }
 
-    fn get(&self) -> MyResult<String> {
+    async fn get(&self) -> MyResult<String> {
         env::set_var("DISPLAY", self.display.clone());
         Ok(self
             .backend
@@ -182,7 +208,7 @@ impl Clipboard for X11Clipboard {
             .unwrap_or_default())
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
+    async fn set(&self, value: &str) -> MyResult<()> {
         env::set_var("DISPLAY", self.display.clone());
         self.backend
             .0
@@ -211,16 +237,17 @@ pub struct HybridClipboard<G: Clipboard, S: Clipboard> {
 //     }
 // }
 
+#[async_trait(?Send)]
 impl<G: Clipboard, S: Clipboard> Clipboard for HybridClipboard<G, S> {
     fn display(&self) -> String {
         self.getter.display()
     }
 
-    fn get(&self) -> MyResult<String> {
-        self.getter.get()
+    async fn get(&self) -> MyResult<String> {
+        self.getter.get().await
     }
 
-    fn set(&self, value: &str) -> MyResult<()> {
-        self.setter.set(value)
+    async fn set(&self, value: &str) -> MyResult<()> {
+        self.setter.set(value).await
     }
 }

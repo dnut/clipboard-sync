@@ -24,3 +24,6 @@ chrono = "0.4"
 itertools = "0.10"
 gag = "1.0"
 clap = { version = "4.0.29", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "*"

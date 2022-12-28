@@ -1,5 +1,7 @@
 use chrono::Local;
+use futures::future::join_all;
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::{thread::sleep, time::Duration};
 use wayland_client::ConnectError;
 use wl_clipboard_rs::paste::Error as PasteError;
@@ -8,15 +10,16 @@ use crate::clipboard::*;
 use crate::error::{MyError, MyResult};
 use crate::log;
 
-pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
+pub async fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     log::info!("identifying unique clipboards...");
-    let mut clipboards = get_clipboards_spec(get_wayland);
+    let mut clipboards = get_clipboards_spec(get_wayland).await;
     let x11_backend = X11Backend::new()?;
-    clipboards.extend(get_clipboards_spec(|n| get_x11(x11_backend.clone(), n)));
+    clipboards.extend(get_clipboards_spec(|n| get_x11(x11_backend.clone(), n)).await);
 
-    let start = clipboards
-        .iter()
-        .map(|c| c.get().unwrap_or_default())
+    let start = join_all(clipboards.iter().map(|c| c.get()).collect::<Vec<_>>())
+        .await
+        .into_iter()
+        .map(|c| c.unwrap_or_default())
         .find(|s| s.is_empty())
         .unwrap_or_default();
 
@@ -26,7 +29,7 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
         if !remove_me.contains(&i) {
             let cb1 = &clipboards[i];
             for (j, cb2) in clipboards.iter().enumerate().take(len).skip(i + 1) {
-                if are_same(cb1, cb2)? {
+                if are_same(cb1, cb2).await? {
                     log::debug!("{cb1:?} is the same as {cb2:?}, removing {cb2:?}");
                     remove_me.insert(j);
                 }
@@ -34,17 +37,17 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
         }
     }
 
-    let clipboards = clipboards
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| !remove_me.contains(i))
-        .map(|(_, c)| c)
-        .collect::<Vec<Box<dyn Clipboard>>>();
+    // let clipboards = clipboards
+    //     .into_iter()
+    //     .enumerate()
+    //     .filter(|(i, _)| !remove_me.contains(i))
+    //     .map(|(_, c)| c)
+    //     .collect::<Vec<Box<dyn Clipboard>>>();
 
-    // let clipboards = dedupe(clipboards)?;
+    let clipboards = dedupe(clipboards).await?;
 
     for c in clipboards.iter() {
-        c.set(&start)?;
+        c.set(&start).await?;
     }
 
     log::info!("Using clipboards: {:?}", clipboards);
@@ -52,28 +55,28 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     Ok(clipboards)
 }
 
-pub fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
+pub async fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
     if clipboards.is_empty() {
         return Err(MyError::NoClipboards);
     }
     loop {
         sleep(Duration::from_millis(100));
-        let new_value = await_change(clipboards)?;
+        let new_value = await_change(clipboards).await?;
         for c in clipboards {
-            c.set(&new_value)?;
+            c.set(&new_value).await?;
         }
     }
 }
 
-fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool> {
+async fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool> {
     let d1 = &one.display();
     let d2 = &two.display();
-    one.set(d1)?;
-    if d1 != &two.get()? {
+    one.set(d1).await?;
+    if d1 != &two.get().await? {
         return Ok(false);
     }
-    two.set(d2)?;
-    if d2 != &one.get()? {
+    two.set(d2).await?;
+    if d2 != &one.get().await? {
         return Ok(false);
     }
 
@@ -131,33 +134,40 @@ fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool
 //         .collect::<Vec<Box<dyn Clipboard>>>())
 // }
 
+/// equality comparison is the bottleneck, and it's composed of two steps. so
+/// the purpose of this function is to minimize the number of executions of
+/// those steps. to do so, these steps are run at different times and combined
+/// at the end. this requires some extra computation in here but that's fine.
+async fn dedupe(clipboards: Vec<Box<dyn Clipboard>>) -> MyResult<Vec<Box<dyn Clipboard>>> {
+    for (i, clipboard) in clipboards.iter().enumerate() {
+        println!("write {i}");
+        clipboard.set(&format!("{}{i}", clipboard.get().await?)).await?;
+    }
+    // let mut results = HashMap::new();
+    let v = clipboards.iter().enumerate().map(|(i, c)| async move {
+        (i, c.get().await.unwrap())
+    }).collect::<Vec<_>>();
+    // for (i, clipboard) in clipboards.iter().enumerate() {
+    //     println!("read {i}");
+    //     results.insert(i, clipboard.get().await?);
+    // }
+    let x = join_all(v).await;
+    println!("{x:#?}");
 
-// /// equality comparison is the bottleneck, and it's composed of two steps. so
-// /// the purpose of this function is to minimize the number of executions of
-// /// those steps. to do so, these steps are run at different times and combined
-// /// at the end. this requires some extra computation in here but that's fine.
-// fn dedupe(clipboards: Vec<Box<dyn Clipboard>>) -> MyResult<Vec<Box<dyn Clipboard>>> {
-//     for (i, clipboard) in clipboards.iter().enumerate() {
-//         println!("write {i}");
-//         clipboard.set(&format!("{}{i}", clipboard.get()?))?;
-//     }
-//     let mut results = HashMap::new();
-//     for (i, clipboard) in clipboards.iter().enumerate() {
-//         println!("read {i}");
-//         results.insert(i, clipboard.get()?);
-//     }
-
-//     todo!()
-// }
+    todo!()
+}
 
 fn check_in_thread() {}
 
-fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
+async fn get_clipboards_spec<
+    Fut: Future<Output = MyResult<Option<Box<dyn Clipboard>>>>,
+    F: Fn(u8) -> Fut,
+>(
     getter: F,
 ) -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
     for i in 0..20 {
-        let result = getter(i);
+        let result = getter(i).await;
         match result {
             Ok(option) => {
                 if let Some(clipboard) = option {
@@ -176,12 +186,12 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
     clipboards
 }
 
-fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
+async fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let wl_display = format!("wayland-{}", n);
     let clipboard = WlrClipboard {
         display: wl_display.clone(),
     };
-    let attempt = clipboard.get();
+    let attempt = clipboard.get().await;
     if let Err(MyError::WlcrsPaste(PasteError::WaylandConnection(
         ConnectError::NoCompositorListening,
     ))) = attempt
@@ -201,19 +211,19 @@ fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     Ok(Some(Box::new(clipboard)))
 }
 
-fn get_x11(backend: X11Backend, n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
+async fn get_x11(backend: X11Backend, n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let display = format!(":{}", n);
     let clipboard = X11Clipboard::new(display, backend);
-    clipboard.get()?;
+    clipboard.get().await?;
 
     Ok(Some(Box::new(clipboard)))
 }
 
-fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
-    let start = clipboards[0].get()?;
+async fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
+    let start = clipboards[0].get().await?;
     loop {
         for c in clipboards {
-            let new = c.get()?;
+            let new = c.get().await?;
             if new != start {
                 log::info!("clipboard updated from display {}", c.display());
                 return Ok(new);

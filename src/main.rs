@@ -14,17 +14,20 @@ mod error;
 mod log;
 mod mustatex;
 mod sync;
+mod asyncification;
 
 #[cfg(not(debug_assertions))]
-fn main() {
+#[tokio::main]
+async fn main() {
     configure();
-    run_forked()
+    run_forked().await
 }
 
+#[tokio::main]
 #[cfg(debug_assertions)]
-fn main() {
+async fn main() {
     configure();
-    run()
+    run().await
 }
 
 /// Simple program to greet a person
@@ -47,7 +50,7 @@ fn configure() {
 }
 
 #[allow(dead_code)]
-fn run_forked() {
+async fn run_forked() {
     let mut c = 0;
     loop {
         match unsafe { fork() }.expect("Failed to fork") {
@@ -61,19 +64,26 @@ fn run_forked() {
                 sleep(Duration::from_secs(1));
                 c += 1;
             }
-            ForkResult::Child => run(),
+            ForkResult::Child => run().await,
         }
     }
 }
 
-fn run() {
+async fn run() {
     log::info!("starting clipboard sync");
-    loop_with_error_pain_management(
-        sync::get_clipboards().unwrap(),
-        |cb| sync::keep_synced(cb),
-        |_| sync::get_clipboards().unwrap(),
-    )
-    .unwrap();
+    loop {
+        let cb = sync::get_clipboards().await.unwrap();
+        match sync::keep_synced(&cb).await {
+            Ok(_) => log::error!("exited unexpectedly, restarting"),
+            Err(e) => log::error!("exited with error {e}, restarting"),
+        }
+    }
+    // loop_with_error_pain_management(
+    //     sync::get_clipboards().unwrap(),
+    //     |cb| sync::keep_synced(cb),
+    //     |_| sync::get_clipboards().unwrap(),
+    // )
+    // .unwrap();
 }
 
 pub fn kill_after(pid: Pid, seconds: u64) {
