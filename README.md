@@ -20,6 +20,7 @@ Install rust: https://www.rust-lang.org/tools/install
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
+git checkout 0.1.0
 make
 sudo make install
 ```
