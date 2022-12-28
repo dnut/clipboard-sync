@@ -7,9 +7,9 @@ macro_rules! mustatex {
 
 				static mut INNER: std::sync::Mutex<$Type> = std::sync::Mutex::new($init);
 
-				pub fn set(level: $Type) {
+				pub fn set(x: $Type) {
 					unsafe {
-						*INNER.lock().unwrap() = level;
+						*INNER.lock().unwrap() = x;
 					}
 				}
 

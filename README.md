@@ -17,16 +17,29 @@ If you want it installed system-wide or want the service to run automatically, u
 
 ### Generic Linux
 Install rust: https://www.rust-lang.org/tools/install
+Download and compile the code:
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
 git checkout 0.1.0
 make
+```
+It can be installed either to the system:
+```bash
 sudo make install
 ```
+or only for the individual user:
+```bash
+make install prefix="$HOME" bin=.bin systemd=.config/systemd
+```
+
 Uninstall with:
 ```bash
 sudo make uninstall
+```
+or for a user install:
+```bash
+make uninstall prefix="$HOME" bin=.bin systemd=.config/systemd
 ```
 
 ### Cargo

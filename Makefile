@@ -1,9 +1,10 @@
 prefix := "/usr/local"
 bin := "bin"
 systemd := "lib/systemd"
+profile := "release"
 
 build:
-	cargo build
+	cargo build --profile $(profile)
 
 install:
 	install -Dm755 target/debug/clipboard-sync "$(prefix)/$(bin)/clipboard-sync"

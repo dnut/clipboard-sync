@@ -27,23 +27,23 @@ fn main() {
     run()
 }
 
-/// Simple program to greet a person
+/// cli arguments
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    // / Name of the person to greet
+    /// granularity to log
     #[arg(long, value_enum, default_value_t = log::Level::default())]
     log_level: log::Level,
 
-    /// whether to include timestamps in the logs (systemd already includes timestamps so you'll want to disable this)
+    /// whether to include timestamps in the logs (systemd already includes timestamps so you'll want to enable this for systemd)
     #[arg(long)]
-    log_timestamp: bool,
+    hide_timestamp: bool,
 }
 
 fn configure() {
     let args = Args::parse();
     log::level::set(args.log_level);
-    log::timestamp::set(args.log_timestamp);
+    log::timestamp::set(!args.hide_timestamp);
 }
 
 #[allow(dead_code)]

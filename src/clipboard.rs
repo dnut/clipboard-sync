@@ -145,16 +145,7 @@ pub struct X11Backend(Rc<RefCell<terminal_clipboard::X11Clipboard>>);
 impl X11Backend {
     /// try to only call this once because repeated initializations may not work.
     /// i started seeing timeouts/errors after 4
-    pub fn new(display: u8) -> MyResult<Self> {
-        // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
-        env::set_var("DISPLAY", format!(":{display}"));
-        let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
-
-        Ok(Self(Rc::new(RefCell::new(backend))))
-    }
-    /// try to only call this once because repeated initializations may not work.
-    /// i started seeing timeouts/errors after 4
-    pub fn new_str(display: &str) -> MyResult<Self> {
+    pub fn new(display: &str) -> MyResult<Self> {
         // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
         env::set_var("DISPLAY", display);
         let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
@@ -174,7 +165,7 @@ impl std::fmt::Debug for X11Clipboard {
 impl X11Clipboard {
     pub fn new(display: String) -> MyResult<Self> {
         Ok(Self {
-            backend: X11Backend::new_str(&display)?,
+            backend: X11Backend::new(&display)?,
             display,
         })
     }
