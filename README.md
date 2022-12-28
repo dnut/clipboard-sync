@@ -12,10 +12,10 @@ Example use cases:
 # Installation
 If you want it installed system-wide or want the service to run automatically, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
 
-### Arch Linux
+## Arch Linux
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
 
-### Generic Linux
+## Generic Linux
 Install rust: https://www.rust-lang.org/tools/install
 Download and compile the code:
 ```bash
@@ -24,25 +24,28 @@ cd clipboard-sync
 git checkout 0.1.0
 make
 ```
-It can be installed either to the system:
+clipboard-sync can be installed either for the user or system-wide
+### System
 ```bash
 sudo make install
 ```
-or only for the individual user:
-```bash
-make install prefix="$HOME" bin=.bin systemd=.config/systemd
-```
-
-Uninstall with:
+to remove:
 ```bash
 sudo make uninstall
 ```
-or for a user install:
+
+### User
+```bash
+make install prefix="$HOME" bin=.bin systemd=.config/systemd
+```
+to remove:
 ```bash
 make uninstall prefix="$HOME" bin=.bin systemd=.config/systemd
 ```
 
-### Cargo
+
+
+## Cargo
 Install rust: https://www.rust-lang.org/tools/install
 
 This will only install the executable, not the service.
