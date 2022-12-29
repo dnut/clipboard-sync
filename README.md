@@ -12,9 +12,7 @@ Example use cases:
 # Installation
 For most users, it is preferred to install clipboard-sync with your operating system's package manager.
 
-If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution). For the time being, you can install using the Generic Linux approach.
-
-The Cargo installation approach may be preferred by rust developers, or users who are not interested in systemd integration and just want a lightweight binary installed to their local cargo directory.
+If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution). For the time being, you can install using the Generic Linux approach. The Cargo installation is an alternative approach for discerning users.
 
 ## Arch Linux
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
