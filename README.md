@@ -21,7 +21,7 @@ The Cargo installation approach may be preferred by rust developers, or users wh
 
 ## Generic Linux
 1. Install rust: https://www.rust-lang.org/tools/install
-2. Download the code:
+2. Download the code from the latest release on [the releases page](https://github.com/dnut/clipboard-sync/releases/) or using git:
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
