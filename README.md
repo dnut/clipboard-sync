@@ -10,7 +10,11 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 # Installation
-If you want it installed system-wide or want the service to run automatically, use "Generic Linux." If you want to install it only for your user account and would like to manually run the command to start the sync, install with cargo.
+For most users, it is preferred to install clipboard-sync with your operating system's package manager.
+
+If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution). For the time being, you can install using the Generic Linux approach.
+
+The Cargo installation approach may be preferred by rust developers, or users who are not interested in systemd integration and just want a lightweight binary installed to their local cargo directory.
 
 ## Arch Linux
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
