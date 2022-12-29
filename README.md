@@ -10,9 +10,9 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 # Installation
-For most users, it is preferred to install clipboard-sync with your operating system's package manager.
+For most users, it is preferred to install clipboard-sync with your operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution).
 
-If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution). While waiting for support on your system, the Generic Linux approach is recommended. The Cargo installation is an alternative approach for discerning users.
+While waiting for support on your system, the Generic Linux approach is recommended. The Cargo installation is an alternative approach for discerning users.
 
 ## Arch Linux
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
