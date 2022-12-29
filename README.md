@@ -16,45 +16,39 @@ If you want it installed system-wide or want the service to run automatically, u
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
 
 ## Generic Linux
-Install rust: https://www.rust-lang.org/tools/install
-Download and compile the code:
+1. Install rust: https://www.rust-lang.org/tools/install
+2. Download the code:
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
 git checkout 0.1.0
-make
 ```
-clipboard-sync can be installed either for the user or system-wide
-### System
+3. Install ***either*** system-wide ***or*** for only the current user:
 ```bash
-sudo make install
+make && sudo make install  # system
+make && make user-install  # user
 ```
-to remove:
+It can be easily uninstalled:
 ```bash
-sudo make uninstall
+sudo make uninstall  # system
+make user-uninstall  # user
 ```
-
-### User
-```bash
-make install prefix="$HOME" bin=.bin systemd=.config/systemd
-```
-to remove:
-```bash
-make uninstall prefix="$HOME" bin=.bin systemd=.config/systemd
-```
-
-
-
 ## Cargo
-Install rust: https://www.rust-lang.org/tools/install
+clipboard-sync is published to crates.io so it can be installed as a normal binary crate.
 
-This will only install the executable, not the service.
+1. Install rust: https://www.rust-lang.org/tools/install
+2. Install clipboard-sync
 ```bash
 cargo install clipboard-sync
 ```
-Uninstall with:
+3. If you want the service, you need to manually download the file and copy it to a systemd folder. For example:
+```bash
+wget -P "$HOME/.config/systemd/" https://raw.githubusercontent.com/dnut/clipboard-sync/master/clipboard-sync.service
+```
+It can be easily uninstalled:
 ```bash
 cargo uninstall clipboard-sync
+rm -r "$HOME/.config/systemd/clipboard-sync.service"
 ```
 
 # Usage
