@@ -25,7 +25,7 @@ The Cargo installation approach may be preferred by rust developers, or users wh
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
-git checkout 0.1.0
+git checkout stable
 ```
 3. Install ***either*** system-wide ***or*** for only the current user:
 ```bash
