@@ -13,3 +13,6 @@ install:
 uninstall:
 	rm -f "$(prefix)/$(bin)/clipboard-sync"
 	rm -f "$(prefix)/$(systemd)/user/clipboard-sync.service"
+
+user-%: 
+	$(MAKE) $* prefix="${HOME}" bin=.bin systemd=.config/systemd
