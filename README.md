@@ -63,3 +63,11 @@ If you don't want it to run constantly, only on-demand, don't use systemd. Direc
 ```bash
 clipboard-sync
 ```
+
+You can also daemonize clipboard-sync using tmux instead of systemd. ~/.bashrc aliases may be handy for these commands.
+```bash
+tmux new-session -ds clipboard-sync clipboard-sync  # start in background
+tmux attach -t clipboard-sync                       # view status
+ctrl-b, d                                           # while viewing status, send back to background
+ctrl-c                                              # while viewing status, terminate the process
+```
