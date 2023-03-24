@@ -7,7 +7,7 @@ build:
 	cargo build --profile $(profile)
 
 install:
-	install -Dm755 target/debug/clipboard-sync "$(prefix)/$(bin)/clipboard-sync"
+	install -Dm755 target/$(profile)/clipboard-sync "$(prefix)/$(bin)/clipboard-sync"
 	install -Dm644 clipboard-sync.service "$(prefix)/$(systemd)/user/clipboard-sync.service"
 
 uninstall:
