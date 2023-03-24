@@ -1,3 +1,5 @@
+/// A static variable that can be safely mutated, using a Mutex.  
+/// Accessible with get/get_mut/set functions.
 macro_rules! mustatex {
 	($($viz:vis $name:ident: $Type:ty = $init:expr;)*) => {
 		$(
