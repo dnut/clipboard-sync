@@ -6,6 +6,7 @@ mustatex! {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
 pub enum Level {
+    Fatal,
     Error,
     Warn,
     Info,
@@ -80,6 +81,15 @@ macro_rules! error {
 	};
 }
 pub(crate) use error;
+
+macro_rules! fatal {
+	($($arg:tt)*) => {
+		if *crate::log::level::get() >= crate::log::Level::Fatal {
+			crate::log::_log!(eprintln, "FATAL", $($arg)*)
+		}
+	};
+}
+pub(crate) use fatal;
 
 macro_rules! _log {
 	($print:ident, $level:literal, $($arg:tt)*) => {{

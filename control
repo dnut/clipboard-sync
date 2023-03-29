@@ -1,0 +1,8 @@
+Package: clipboard-sync
+Version: 0.2.0-1
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libxcb1, libxcb-render0, libxcb-shape0, libxcb-xfixes0
+Maintainer: Drew Nutter <dnut@users.noreply.github.com>
+Description: Synchronizes the clipboard across multiple X11 and wayland instances running on the same machine.

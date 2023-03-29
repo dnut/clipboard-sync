@@ -17,6 +17,27 @@ While waiting for support on your system, the Generic Linux approach is recommen
 ## Arch Linux
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
 
+## Ubuntu & Debian
+For now, you have to build your own deb file from source. But the steps are simple.
+
+1. Install the build tools:
+  - `sudo apt install make gcc libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev`
+  - rust: https://www.rust-lang.org/tools/install
+2. Download the code from the latest release on [the releases page](https://github.com/dnut/clipboard-sync/releases/) or using git:
+```bash
+git clone https://github.com/dnut/clipboard-sync.git
+cd clipboard-sync
+git checkout stable
+```
+3. Build the deb file
+```bash
+make && make deb
+```
+3. Install the deb file
+```bash
+sudo apt install ./dist/deb/clipboard-sync_*.deb
+```
+
 ## Generic Linux
 1. Install rust: https://www.rust-lang.org/tools/install
 2. Download the code from the latest release on [the releases page](https://github.com/dnut/clipboard-sync/releases/) or using git:

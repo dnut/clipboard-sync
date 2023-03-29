@@ -5,6 +5,7 @@ use nix::sys::signal::{self, Signal};
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use nix::unistd::{fork, Pid};
 use nix::{sys::wait::waitpid, unistd::ForkResult};
+use std::f64::consts::E;
 use std::thread;
 use std::time::SystemTime;
 use std::{thread::sleep, time::Duration};
@@ -61,6 +62,7 @@ fn configure_logging(args: &Args) {
 #[allow(dead_code)]
 fn run_forked() {
     log::info!("started clipboard sync manager");
+    let mut panics = 0;
     loop {
         match unsafe { fork() }.expect("Failed to fork") {
             ForkResult::Parent { child } => {
@@ -68,7 +70,15 @@ fn run_forked() {
                 kill_after(child, 600);
                 let status = waitpid(Some(child), None)
                     .expect("there was a problem managing the child process, so the service is exiting. check that pid {child} is not running before restarting this service");
-                log::debug!("child process {child} completed with: {:?}", status);
+                log::debug!("child process {child} completed with: {status:?}");
+                if let WaitStatus::Exited(_, 101) = status {
+                    panics += 1;
+                    if panics < 4 {
+                        log::fatal!("child process {child} panicked. giving it another try");
+                    } else {
+                        panic!("child process {child} panicked too many times.");
+                    }
+                }
                 sleep(Duration::from_secs(1));
             }
             ForkResult::Child => run(),
@@ -123,46 +133,38 @@ fn loop_with_error_pain_management<
     recovery: Recovery,
 ) -> MyResult<Return> {
     let mut input = initial_input;
-    let mut errorcount: u64 = 0;
-    let mut first_error: SystemTime = SystemTime::UNIX_EPOCH;
-    let mut last_error: SystemTime = SystemTime::UNIX_EPOCH;
+    let mut errors = vec![];
     loop {
         match action(&input) {
             Ok(ret) => return Ok(ret),
             Err(err) => {
-                log::error!("action exited with error: {:?}", err);
+                log::fatal!("action exited with error: {:?}", err);
                 let now = SystemTime::now();
-                input = recovery(input);
-                if errorcount == 0 {
-                    first_error = now;
-                } else if SystemTime::now().duration_since(last_error).unwrap()
-                    > Duration::from_secs(10)
-                {
-                    errorcount = 0;
-                } else {
-                    let error_session_seconds = SystemTime::now()
-                        .duration_since(first_error)
-                        .unwrap()
-                        .as_secs();
-                    let error_session_rate_scaled = errorcount
-                        .checked_mul(100)
-                        .unwrap_or(u64::MAX)
-                        .checked_div(error_session_seconds)
-                        .unwrap_or(u64::MAX);
-                    let error_pain = error_session_rate_scaled
-                        .checked_add(error_session_seconds)
-                        .unwrap_or(u64::MAX);
-                    if error_pain > 100 {
-                        Err("too many errors, exiting".to_string())
-                            .standardize()
-                            .generify()?;
-                    }
+                errors.push(now);
+                if total_pain(now, errors.clone()) > 5.0 {
+                    return Err("too many errors, exiting".to_string())
+                        .standardize()
+                        .generify();
                 }
-                last_error = now;
-                errorcount += 1;
+                input = recovery(input);
                 sleep(Duration::from_millis(1000));
             }
         }
         log::info!("retrying");
     }
+}
+
+/// Sum the pain of numerous painful events, measured by how long ago they
+/// happened.
+fn total_pain(now: SystemTime, errors: Vec<SystemTime>) -> f64 {
+    errors
+        .into_iter()
+        .map(|et| remaining_pain(now.duration_since(et).unwrap().as_secs()))
+        .sum()
+}
+
+/// Looks at a painful event and determines how much of its pain is left.  
+/// calculated as exponential decay with a half-life of 1 minute.
+fn remaining_pain(seconds_ago: u64) -> f64 {
+    E.powf(-(seconds_ago as f64) / 86.5617024533378044416)
 }
