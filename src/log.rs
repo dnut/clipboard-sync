@@ -1,6 +1,7 @@
 mustatex! {
     pub(crate) level: Level = Level::Debug;
     pub(crate) timestamp: bool = true;
+    pub(crate) log_sensitive_information: bool = false;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
@@ -9,14 +10,40 @@ pub enum Level {
     Warn,
     Info,
     Debug,
+    Trace,
 }
 
-impl Default for Level {	
+impl Default for Level {
     fn default() -> Self {
-        #[cfg(debug_assertions)] return Level::Debug;
-		#[cfg(not(debug_assertions))] Level::Info
+        #[cfg(debug_assertions)]
+        return Level::Debug;
+        #[cfg(not(debug_assertions))]
+        Level::Info
     }
 }
+
+/// This is for debug logging of sensitive information that you usually don't
+/// want to log in production, even if debug logging is enabled. It won't log
+/// anything unless `sensitive` is set to true.  
+/// In this crate, it's used to log clipboard contents.
+macro_rules! sensitive {
+	($($arg:tt)*) => {
+		if *crate::log::level::get() >= crate::log::Level::Debug
+		&& *crate::log::log_sensitive_information::get() {
+			crate::log::_log!(println, "SENSI", $($arg)*)
+		}
+	};
+}
+pub(crate) use sensitive;
+
+macro_rules! trace {
+	($($arg:tt)*) => {
+		if *crate::log::level::get() >= crate::log::Level::Trace {
+			crate::log::_log!(println, "TRACE", $($arg)*)
+		}
+	};
+}
+pub(crate) use trace;
 
 macro_rules! debug {
 	($($arg:tt)*) => {

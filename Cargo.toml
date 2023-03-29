@@ -23,4 +23,4 @@ thiserror = "1.0"
 chrono = "0.4"
 itertools = "0.10"
 gag = "1.0"
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive", "wrap_help"] }

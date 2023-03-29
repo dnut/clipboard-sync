@@ -9,7 +9,7 @@ use crate::error::{MyError, MyResult, StandardizedError};
 use crate::log;
 
 pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
-    log::info!("identifying unique clipboards...");
+    log::debug!("identifying unique clipboards...");
     let mut clipboards = get_clipboards_spec(get_wayland);
     // let x11_backend = X11Backend::new()?;
     clipboards.extend(get_clipboards_spec(get_x11));
@@ -17,8 +17,9 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     let start = clipboards
         .iter()
         .map(|c| c.get().unwrap_or_default())
-        .find(|s| s.is_empty())
+        .find(|s| !s.is_empty())
         .unwrap_or_default();
+    log::sensitive!("Clipboard contents at the start: '{start}'");
 
     let mut remove_me = HashSet::new();
     let len = clipboards.len();
@@ -26,7 +27,7 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
         if !remove_me.contains(&i) {
             let cb1 = &clipboards[i];
             for (j, cb2) in clipboards.iter().enumerate().take(len).skip(i + 1) {
-                if are_same(cb1, cb2)? {
+                if are_same(&**cb1, &**cb2)? {
                     log::debug!("{cb1:?} is the same as {cb2:?}, removing {cb2:?}");
                     remove_me.insert(j);
                 }
@@ -65,7 +66,7 @@ pub fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
     }
 }
 
-fn are_same(one: &Box<dyn Clipboard>, two: &Box<dyn Clipboard>) -> MyResult<bool> {
+fn are_same(one: &dyn Clipboard, two: &dyn Clipboard) -> MyResult<bool> {
     let d1 = &one.display();
     let d2 = &two.display();
     one.set(d1)?;
@@ -165,7 +166,7 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
             Err(MyError::TerminalClipboard(StandardizedError {
                 inner,
                 stdio: None,
-            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => log::debug!(
+            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => log::trace!(
                 "known issue connecting to x11 clipboard :{i}. typically this happens when you try to attach to a gnome clipboard using too many x11 clipboards: {inner}",
             ),
             Err(err) => log::error!(
@@ -219,6 +220,7 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
             let new = c.get()?;
             if new != start {
                 log::info!("clipboard updated from display {}", c.display());
+                log::sensitive!("clipboard contents: '{}'", new);
                 return Ok(new);
             }
         }

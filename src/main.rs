@@ -15,51 +15,61 @@ mod log;
 mod mustatex;
 mod sync;
 
-#[cfg(not(debug_assertions))]
 fn main() {
-    configure();
-    run_forked()
-}
-
-#[cfg(debug_assertions)]
-fn main() {
-    configure();
-    run()
+    let args = Args::parse();
+    configure_logging(&args);
+    if args.run_forked {
+        run_forked()
+    } else {
+        run()
+    }
 }
 
 /// cli arguments
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, max_term_width = 120)]
 struct Args {
     /// granularity to log
     #[arg(long, value_enum, default_value_t = log::Level::default())]
     log_level: log::Level,
 
-    /// whether to include timestamps in the logs (systemd already includes timestamps so you'll want to enable this for systemd)
+    /// whether to include timestamps in the logs (systemd already includes
+    /// timestamps so you'll want to enable this for systemd)
     #[arg(long)]
     hide_timestamp: bool,
+
+    /// whether to run the sync forked so the state can be cleaned up
+    /// periodically. typically, this should be true.
+    #[arg(long)]
+    #[cfg_attr(not(debug_assertions), arg(default_value_t = true))]
+    run_forked: bool,
+
+    /// when debug logging is enabled, it won't show clipboard contents, because
+    /// clipboard contents are sensitive user information. but if you set this
+    /// to true, in addition to enabling debug logging, then it will log the
+    /// clipboard contents.
+    #[arg(long)]
+    log_clipboard_contents: bool,
 }
 
-fn configure() {
-    let args = Args::parse();
+fn configure_logging(args: &Args) {
     log::level::set(args.log_level);
     log::timestamp::set(!args.hide_timestamp);
+    log::log_sensitive_information::set(args.log_clipboard_contents);
 }
 
 #[allow(dead_code)]
 fn run_forked() {
-    let mut c = 0;
+    log::info!("started clipboard sync manager");
     loop {
         match unsafe { fork() }.expect("Failed to fork") {
             ForkResult::Parent { child } => {
-                if c == 0 {
-                    log::info!("started clipboard sync manager");
-                }
+                log::debug!("child process {child} successfully initialized.");
                 kill_after(child, 600);
-                let status = waitpid(Some(child), None);
-                log::info!("child process completed with: {:?}", status);
+                let status = waitpid(Some(child), None)
+                    .expect("there was a problem managing the child process, so the service is exiting. check that pid {child} is not running before restarting this service");
+                log::debug!("child process {child} completed with: {:?}", status);
                 sleep(Duration::from_secs(1));
-                c += 1;
             }
             ForkResult::Child => run(),
         }
@@ -78,10 +88,18 @@ fn run() {
 
 pub fn kill_after(pid: Pid, seconds: u64) {
     thread::spawn(move || {
+        log::debug!("waiting {seconds} seconds and then killing {pid}.");
         thread::sleep(Duration::from_secs(seconds));
-        if let Ok(WaitStatus::StillAlive) = waitpid(Some(pid), Some(WaitPidFlag::WNOWAIT)) {
-            log::info!("killing subprocess {pid}");
-            signal::kill(pid, Signal::SIGTERM).unwrap();
+        match waitpid(Some(pid), Some(WaitPidFlag::WNOHANG)) {
+            Ok(WaitStatus::StillAlive) => log::debug!("child {pid} is still alive, as expected."),
+            Ok(ok) => {
+                log::warning!("expected child process {pid} to be StillAlive but got: {ok:?}")
+            }
+            Err(e) => log::error!("error getting status of child process {pid}: {e}"),
+        }
+        log::debug!("routinely attempting to kill child process {pid}.");
+        if let Err(e) = signal::kill(pid, Signal::SIGTERM) {
+            log::error!("error killing child process {pid}: {e}")
         }
     });
 }
