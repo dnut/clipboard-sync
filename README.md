@@ -27,7 +27,6 @@ For now, you have to build your own deb file from source. But the steps are simp
 ```bash
 git clone https://github.com/dnut/clipboard-sync.git
 cd clipboard-sync
-git checkout stable
 ```
 3. Build the deb file
 ```bash
