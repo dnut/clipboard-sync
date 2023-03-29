@@ -36,7 +36,7 @@ sudo make uninstall  # system
 make user-uninstall  # user
 ```
 ## Cargo
-clipboard-sync is published to crates.io, so it can be installed as a normal binary crate.
+[clipboard-sync](https://crates.io/crates/clipboard-sync) is published to crates.io, so it can be installed as a normal binary crate.
 
 1. Install rust: https://www.rust-lang.org/tools/install
 2. Install clipboard-sync
