@@ -43,7 +43,9 @@ make user-uninstall  # user
 ```bash
 cargo install clipboard-sync
 ```
-3. If you want the service, you need to manually download the file and copy it to a systemd folder. For example:
+3. Run it with the `clipboard-sync` command.
+
+If you want it to run in the background, you can use tmux or you can manually download the systemd service file and copy it to a systemd folder. For example:
 ```bash
 wget -P "$HOME/.config/systemd/" https://raw.githubusercontent.com/dnut/clipboard-sync/master/clipboard-sync.service
 ```
