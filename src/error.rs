@@ -6,8 +6,18 @@ pub type MyResult<T> = Result<T, MyError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum MyError {
-    #[error("{0}")]
+    /// Only use this catchall to deal with unexpected errors that are very
+    /// difficult to deal with in another way.
+    #[error("Unknown error: {0}")]
     Generic(#[from] Box<dyn StdError>),
+
+    /// High level error to represent the idea that the application is crashing,
+    /// indicating the cause(s) of that crash.
+    #[error("Application crash '{msg}': {cause:#?}")]
+    Crash {
+        msg: String,
+        cause: Vec<MyError>,
+    },
 
     #[error("failed to get wlr clipboard: {0}")]
     WlcrsPaste(#[from] wl_clipboard_rs::paste::Error),
@@ -49,6 +59,7 @@ impl<E: Debug> Display for StandardizedError<E> {
 impl<E: Debug> StdError for StandardizedError<E> {}
 
 pub trait Standardize<T, E: Sized + Debug>: Sized {
+    /// Convert any Sized + Debug into a std::error::Error
     fn standardize(self) -> Result<T, StandardizedError<E>>;
 }
 
@@ -77,6 +88,7 @@ impl<T, E: Sized + Debug> Standardize<T, E> for (Result<T, E>, StdIo) {
 }
 
 pub trait Generify<T, E: 'static + StdError> {
+    /// Convert any std::error::Error into MyError::Generic
     fn generify(self) -> Result<T, MyError>;
 }
 

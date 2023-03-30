@@ -1,6 +1,6 @@
 use chrono::Local;
 use clap::Parser;
-use error::{Generify, MyResult, Standardize};
+use error::MyResult;
 use nix::sys::signal::{self, Signal};
 use nix::sys::wait::{WaitPidFlag, WaitStatus};
 use nix::unistd::{fork, Pid};
@@ -9,6 +9,8 @@ use std::f64::consts::E;
 use std::thread;
 use std::time::SystemTime;
 use std::{thread::sleep, time::Duration};
+
+use crate::error::MyError;
 
 mod clipboard;
 mod error;
@@ -133,6 +135,7 @@ fn loop_with_error_pain_management<
     recovery: Recovery,
 ) -> MyResult<Return> {
     let mut input = initial_input;
+    let mut error_times = vec![];
     let mut errors = vec![];
     loop {
         match action(&input) {
@@ -140,11 +143,13 @@ fn loop_with_error_pain_management<
             Err(err) => {
                 log::fatal!("action exited with error: {:?}", err);
                 let now = SystemTime::now();
-                errors.push(now);
-                if total_pain(now, errors.clone()) > 5.0 {
-                    return Err("too many errors, exiting".to_string())
-                        .standardize()
-                        .generify();
+                error_times.push(now);
+                errors.push(err);
+                if total_pain(now, error_times.clone()) > 5.0 {
+                    return Err(MyError::Crash {
+                        msg: "too many errors, exiting".to_string(),
+                        cause: errors,
+                    });
                 }
                 input = recovery(input);
                 sleep(Duration::from_millis(1000));
