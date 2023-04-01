@@ -8,9 +8,10 @@ Example use cases:
 - **Nested wayland**: You run a wayland compositor within a window. examples:
   - you primarily use kde, but run sway in a window to consolidate all your messenger apps into a single tiled/tabbed window.
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
+- **VNC**: You run a VNC server and would like all host and client logins from the same user to share the same clipboard.
 
 # Installation
-For most users, it is preferred to install clipboard-sync with your operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution).
+Most users should install clipboard-sync with their operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution).
 
 While waiting for support on your system, the Generic Linux approach is recommended. The Cargo installation is an alternative approach for discerning users.
 
@@ -55,6 +56,7 @@ It can be easily uninstalled:
 sudo make uninstall  # system
 make user-uninstall  # user
 ```
+
 ## Cargo
 [clipboard-sync](https://crates.io/crates/clipboard-sync) is published to crates.io, so it can be installed as a normal binary crate.
 
