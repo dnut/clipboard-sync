@@ -23,15 +23,14 @@ impl Default for Level {
     }
 }
 
-/// This is for debug logging of sensitive information that you usually don't
-/// want to log in production, even if debug logging is enabled. It won't log
-/// anything unless `sensitive` is set to true.  
+/// This is for logging of sensitive information that you usually don't want to
+/// log in production, regardless of log level. It won't log anything unless
+/// `sensitive` is set to true.  
 /// In this crate, it's used to log clipboard contents.
 macro_rules! sensitive {
-	($($arg:tt)*) => {
-		if *crate::log::level::get() >= crate::log::Level::Debug
-		&& *crate::log::log_sensitive_information::get() {
-			crate::log::_log!(println, "SENSI", $($arg)*)
+	($log_macro:path, $($arg:tt)*) => {
+		if *crate::log::log_sensitive_information::get() {
+			$log_macro!("Sensitive: {}", format!($($arg)*))
 		}
 	};
 }

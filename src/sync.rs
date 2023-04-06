@@ -19,7 +19,7 @@ pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
         .map(|c| c.get().unwrap_or_default())
         .find(|s| !s.is_empty())
         .unwrap_or_default();
-    log::sensitive!("Clipboard contents at the start: '{start}'");
+    log::sensitive!(log::info, "Clipboard contents at the start: '{start}'");
 
     let mut remove_me = HashSet::new();
     let len = clipboards.len();
@@ -231,7 +231,7 @@ fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
             let new = c.get()?;
             if new != start {
                 log::info!("clipboard updated from display {}", c.display());
-                log::sensitive!("clipboard contents: '{}'", new);
+                log::sensitive!(log::info, "clipboard contents: '{}'", new);
                 return Ok(new);
             }
         }
