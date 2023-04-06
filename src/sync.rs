@@ -6,7 +6,7 @@ use wl_clipboard_rs::paste::Error as PasteError;
 
 use crate::clipboard::*;
 use crate::error::{MyError, MyResult, StandardizedError};
-use crate::log;
+use crate::log::{self, concise_numbers};
 
 pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
     log::debug!("identifying unique clipboards...");
@@ -154,6 +154,8 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
     getter: F,
 ) -> Vec<Box<dyn Clipboard>> {
     let mut clipboards: Vec<Box<dyn Clipboard>> = Vec::new();
+    let mut xcb_conn_err = None;
+    let mut xcb_conn_failed_clipboards = vec![];
     for i in 0..u8::MAX {
         let result = getter(i);
         match result {
@@ -166,15 +168,24 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
             Err(MyError::TerminalClipboard(StandardizedError {
                 inner,
                 stdio: None,
-            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => log::trace!(
-                "known issue connecting to x11 clipboard :{i}. typically this happens when you try to attach to a gnome clipboard using too many x11 clipboards: {inner}",
-            ),
+            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => {
+                xcb_conn_failed_clipboards.push(i);
+                xcb_conn_err = Some(inner);
+            },
             Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
                 i,
                 err
             ),
         }
+    }
+    if let Some(err) = xcb_conn_err {
+        let displays = concise_numbers(&xcb_conn_failed_clipboards);
+        log::warning!(
+            "Issue connecting to some x11 clipboards. \
+This is expected when hooking up to gnome wayland, and not a problem in that context. \
+Details: '{err}' for x11 displays: {displays}",
+        );
     }
 
     clipboards

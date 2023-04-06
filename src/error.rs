@@ -14,10 +14,7 @@ pub enum MyError {
     /// High level error to represent the idea that the application is crashing,
     /// indicating the cause(s) of that crash.
     #[error("Application crash '{msg}': {cause:#?}")]
-    Crash {
-        msg: String,
-        cause: Vec<MyError>,
-    },
+    Crash { msg: String, cause: Vec<MyError> },
 
     #[error("failed to get wlr clipboard: {0}")]
     WlcrsPaste(#[from] wl_clipboard_rs::paste::Error),

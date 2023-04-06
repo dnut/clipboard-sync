@@ -127,3 +127,66 @@ pub fn truncate(s: &str, max_chars: usize) -> &str {
         Some((idx, _)) => &s[..idx],
     }
 }
+
+pub fn concise_numbers(ns: &[u8]) -> String {
+    if ns.len() == 0 {
+        return "[]".to_string();
+    }
+    if ns.len() == 1 {
+        return format!("[{}]", ns[0]);
+    }
+    let mut range_size = 1;
+    let mut strings = vec![];
+    for nn in ns.windows(2) {
+        let [n1, n2]: [u8] = *nn else {unreachable!()};
+        if n1 + 1 == n2 {
+            range_size += 1;
+        } else {
+            range_size = 1;
+        }
+        if range_size < 3 {
+            strings.push(format!("{n1}"));
+        }
+        if range_size == 3 {
+            strings.push("..".to_string());
+        }
+    }
+    strings.push(format!("{}", ns[ns.len() - 1]));
+    strings.push("..".to_owned());
+    let mut full_strings = vec![];
+    for ss in strings.windows(2) {
+        let [s1, s2] = ss else {unreachable!()};
+        full_strings.push(s1.to_owned());
+        if s1 != ".." && s2 != ".." {
+            full_strings.push(", ".to_owned());
+        }
+    }
+    format!("[{}]", full_strings.join(""))
+}
+
+#[test]
+fn test() {
+    assert_eq!("[]", concise_numbers(&[]));
+    assert_eq!("[123]", concise_numbers(&[123]));
+    assert_eq!("[1..5]", concise_numbers(&[1, 2, 3, 4, 5]));
+    assert_eq!(
+        "[0, 2..4, 6..8, 10, 11]",
+        concise_numbers(&[0, 2, 3, 4, 6, 7, 8, 10, 11])
+    );
+    assert_eq!(
+        "[0, 2..4, 6..8, 10..12]",
+        concise_numbers(&[0, 2, 3, 4, 6, 7, 8, 10, 11, 12])
+    );
+    assert_eq!(
+        "[0, 2..4, 6..8, 10]",
+        concise_numbers(&[0, 2, 3, 4, 6, 7, 8, 10])
+    );
+    assert_eq!(
+        "[0..4, 6..8, 10]",
+        concise_numbers(&[0, 1, 2, 3, 4, 6, 7, 8, 10])
+    );
+    assert_eq!(
+        "[0, 1, 3, 4, 6..8, 10]",
+        concise_numbers(&[0, 1, 3, 4, 6, 7, 8, 10])
+    );
+}
