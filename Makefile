@@ -17,10 +17,16 @@ uninstall:
 user-%: 
 	$(MAKE) $* prefix="${HOME}" bin=.bin systemd=.config/systemd
 
+#TODO: most likely it is better to get the value from the tomls file
+deb%: deb_version := $$(grep Version control | sed 's/Version: *//g')
+
 deb:
 	rm -rf dist/deb
-	deb_version=$(grep Version control | sed 's/Version: *//g')
-	mkdir -p dist/deb/clipboard-sync_${deb_version}/DEBIAN
-	$(MAKE) install prefix=dist/deb/clipboard-sync_${deb_version}
-	cp control dist/deb/clipboard-sync_${deb_version}/DEBIAN/control
-	dpkg-deb --build dist/deb/clipboard-sync_${deb_version}
+	mkdir -p dist/deb/clipboard-sync_$(deb_version)/DEBIAN
+	$(MAKE) install prefix=dist/deb/clipboard-sync_$(deb_version)
+	cp control dist/deb/clipboard-sync_$(deb_version)/DEBIAN/control
+	dpkg-deb --build dist/deb/clipboard-sync_$(deb_version)
+
+deblint:
+	lintian dist/deb/clipboard-sync_$(deb_version).deb
+
