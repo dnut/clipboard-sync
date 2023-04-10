@@ -36,6 +36,7 @@ macro_rules! sensitive {
 }
 pub(crate) use sensitive;
 
+#[allow(unused)]
 macro_rules! trace {
 	($($arg:tt)*) => {
 		if *crate::log::level::get() >= crate::log::Level::Trace {
@@ -43,6 +44,7 @@ macro_rules! trace {
 		}
 	};
 }
+#[allow(unused)]
 pub(crate) use trace;
 
 macro_rules! debug {
@@ -128,7 +130,7 @@ pub fn truncate(s: &str, max_chars: usize) -> &str {
 }
 
 pub fn concise_numbers(ns: &[u8]) -> String {
-    if ns.len() == 0 {
+    if ns.is_empty() {
         return "[]".to_string();
     }
     if ns.len() == 1 {

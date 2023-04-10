@@ -171,5 +171,5 @@ fn total_pain(now: SystemTime, errors: Vec<SystemTime>) -> f64 {
 /// Looks at a painful event and determines how much of its pain is left.  
 /// calculated as exponential decay with a half-life of 1 minute.
 fn remaining_pain(seconds_ago: u64) -> f64 {
-    E.powf(-(seconds_ago as f64) / 86.5617024533378044416)
+    E.powf(-(seconds_ago as f64) / 86.561_702_453_337_8)
 }
