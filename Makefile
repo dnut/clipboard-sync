@@ -2,6 +2,7 @@ prefix := "/usr/local"
 bin := "bin"
 systemd := "lib/systemd"
 profile := "release"
+deb_version := $(shell grep Version control | sed 's/Version: *//g')
 
 build:
 	cargo build --profile $(profile)
@@ -19,8 +20,10 @@ user-%:
 
 deb:
 	rm -rf dist/deb
-	deb_version=$(grep Version control | sed 's/Version: *//g')
-	mkdir -p dist/deb/clipboard-sync_${deb_version}/DEBIAN
-	$(MAKE) install prefix=dist/deb/clipboard-sync_${deb_version}
-	cp control dist/deb/clipboard-sync_${deb_version}/DEBIAN/control
-	dpkg-deb --build dist/deb/clipboard-sync_${deb_version}
+	mkdir -p dist/deb/clipboard-sync_$(deb_version)/DEBIAN
+	$(MAKE) install prefix=dist/deb/clipboard-sync_$(deb_version)
+	cp control dist/deb/clipboard-sync_$(deb_version)/DEBIAN/control
+	dpkg-deb --build dist/deb/clipboard-sync_$(deb_version)
+
+deblint:
+	lintian dist/deb/clipboard-sync_$(deb_version).deb

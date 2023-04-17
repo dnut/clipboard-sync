@@ -1,6 +1,6 @@
 Package: clipboard-sync
 Version: 0.2.0-1
-Section: base
+Section: clipboard
 Priority: optional
 Architecture: amd64
 Depends: libxcb1, libxcb-render0, libxcb-shape0, libxcb-xfixes0
