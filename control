@@ -1,5 +1,5 @@
 Package: clipboard-sync
-Version: 0.1.0-11
+Version: 0.2.0-1
 Section: clipboard
 Priority: optional
 Architecture: amd64
