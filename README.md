@@ -12,7 +12,7 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 # Installation
-Most users should install clipboard-sync with their operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aopen+is%3Aissue+label%3Adistribution), or create one if it does not exist.
+Most users should install clipboard-sync with their operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aissue+label%3Adistribution), or create one if it does not exist.
 
 While waiting for support on your system, there are two other options:
 - [Generic Linux](#generic-linux)
