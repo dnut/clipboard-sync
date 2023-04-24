@@ -27,13 +27,9 @@ While waiting for support on your system, there are two other options:
 [clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
 
 ## Ubuntu & Debian
-Add the repository:
+Install from the official repository:
 ```bash
 sudo wget -P /etc/apt/sources.list.d/ https://raw.githubusercontent.com/dnut/deb/master/dnut.list
-```
-
-Install the package:
-```bash
 sudo apt update && sudo apt install clipboard-sync
 ```
 
