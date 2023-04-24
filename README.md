@@ -12,9 +12,20 @@ Example use cases:
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
 
 # Installation
-Most users should install clipboard-sync with their operating system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aissue+label%3Adistribution), or create one if it does not exist.
+Install clipboard-sync with your system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aissue+label%3Adistribution), or create one if it does not exist.
 
-While waiting for support on your system, there are two other options:
+### Arch Linux
+[clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
+
+### Ubuntu & Debian
+Install from the official repository:
+```bash
+sudo wget -P /etc/apt/sources.list.d/ https://raw.githubusercontent.com/dnut/deb/master/dnut.list
+sudo apt update && sudo apt install clipboard-sync
+```
+
+## Advanced Installation
+If your system is not supported, you have two other options:
 - [Generic Linux](#generic-linux)
   - automatically and cleanly installs or uninstalls the entire package.
   - requires extra steps to acquire the source code.
@@ -23,22 +34,7 @@ While waiting for support on your system, there are two other options:
   - requires extra steps to manually edit and install a systemd service if desired.
   - If you use [cargo-update](https://crates.io/crates/cargo-update), it can make updates to the executable easier.
 
-## Arch Linux
-[clipboard-sync](https://aur.archlinux.org/packages/clipboard-sync) is available in the Arch User Repository.
-
-## Ubuntu & Debian
-Install from the official repository:
-```bash
-sudo wget -P /etc/apt/sources.list.d/ https://raw.githubusercontent.com/dnut/deb/master/dnut.list
-sudo apt update && sudo apt install clipboard-sync
-```
-
-Alternatively, you can [Build from Source](#build-from-source), then run:
-```bash
-make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
-```
-
-## Generic Linux
+### Generic Linux
 [Build from Source](#build-from-source), then install ***either*** system-wide ***or*** for only the current user:
 ```bash
 sudo make install  # system
@@ -50,7 +46,7 @@ sudo make uninstall  # system
 make user-uninstall  # user
 ```
 
-## Cargo
+### Cargo
 [clipboard-sync](https://crates.io/crates/clipboard-sync) is published to crates.io, so it can be installed as a normal binary crate.
 
 1. Install rust: https://www.rust-lang.org/tools/install
@@ -68,7 +64,13 @@ cargo uninstall clipboard-sync
 rm -r "$HOME/.config/systemd/clipboard-sync.service"
 ```
 
-## Build from Source
+### Ubuntu & Debian (advanced)
+In addition to installing from the official repository, you can also build and install the deb package from source. Follow the instructions to [Build from Source](#build-from-source), then create a deb file and install it with:
+```bash
+make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
+```
+
+# Build from Source
 
 1. Ensure you have the build dependencies: rust make gcc libc libxcb
 - install rust using rustup: https://www.rust-lang.org/tools/install
