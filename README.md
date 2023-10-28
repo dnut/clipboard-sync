@@ -2,6 +2,8 @@
 
 Synchronizes the clipboard across multiple X11 and wayland instances running on the same machine.
 
+To use clipboard sync, you only need to install it and start the service. It identifies and synchronizes your clipboards automatically.
+
 Example use cases:
 
 - **Improve Wayland compatibility**: You have already enabled support for wayland in your system, but your computer does not synchronize the clipboard between X11 and wayland windows. clipboard-sync can solve this problem. [more details](https://github.com/dnut/clipboard-sync/issues/9#issuecomment-1502368133)
@@ -10,6 +12,11 @@ Example use cases:
 - **Nested Wayland**: You run a wayland compositor within a window. examples:
   - you primarily use kde, but run sway in a window to consolidate all your messenger apps into a single tiled/tabbed window.
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
+
+Table of Contents:
+- [Installation](#installation)
+- [Usage](#usage)
+- [Build From Source](#build-from-source)
 
 # Installation
 Install clipboard-sync with your system's package manager. If your system is not supported, please vote on [the appropriate issue](https://github.com/dnut/clipboard-sync/issues?q=is%3Aissue+label%3Adistribution), or create one if it does not exist.
@@ -70,6 +77,25 @@ In addition to installing from the official repository, you can also build and i
 make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
 ```
 
+# Usage
+The typical set-and-forget approach is to enable to service:
+```bash
+systemctl --user enable --now clipboard-sync
+```
+
+If you don't want it to run constantly, only on-demand, don't use systemd. Directly call the binary as needed:
+```bash
+clipboard-sync
+```
+
+You can also daemonize clipboard-sync using tmux instead of systemd. ~/.bashrc aliases may be handy for these commands.
+```bash
+tmux new-session -ds clipboard-sync clipboard-sync  # start in background
+tmux attach -t clipboard-sync                       # view status
+ctrl-b, d                                           # while viewing status, send back to background
+ctrl-c                                              # while viewing status, terminate the process
+```
+
 # Build from Source
 
 1. Ensure you have the build dependencies: rust make gcc libc libxcb
@@ -94,23 +120,4 @@ make
 The executable is here:
 ```bash
 ./target/release/clipboard-sync
-```
-
-# Usage
-The typical set-and-forget approach is to enable to service:
-```bash
-systemctl --user enable --now clipboard-sync
-```
-
-If you don't want it to run constantly, only on-demand, don't use systemd. Directly call the binary as needed:
-```bash
-clipboard-sync
-```
-
-You can also daemonize clipboard-sync using tmux instead of systemd. ~/.bashrc aliases may be handy for these commands.
-```bash
-tmux new-session -ds clipboard-sync clipboard-sync  # start in background
-tmux attach -t clipboard-sync                       # view status
-ctrl-b, d                                           # while viewing status, send back to background
-ctrl-c                                              # while viewing status, terminate the process
 ```
