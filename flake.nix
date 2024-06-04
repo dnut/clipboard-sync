@@ -21,7 +21,7 @@
             };
 
             config = lib.mkIf config.services.clipboard-sync.enable {
-              systemd.services.clipboard-sync = {
+              systemd.user.services.clipboard-sync = {
 		description = "Synchronize clipboards across all displays";
 		documentation = [ "https://github.com/dnut/clipboard-sync/" ];
 		wantedBy = [ "graphical-session.target" ];
