@@ -17,7 +17,7 @@
 	  # For illustration, probably want to break this definition out to a separate file
 	  { config, pkgs, lib, ... }: {
             options = {
-              services.myApp.enable = lib.mkEnableOption "clipboard-sync";
+              services.clipboard-sync.enable = lib.mkEnableOption "clipboard-sync";
             };
 
             config = lib.mkIf config.services.clipboard-sync.enable {
