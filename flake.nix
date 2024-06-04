@@ -22,8 +22,14 @@
 
             config = lib.mkIf config.services.clipboard-sync.enable {
               systemd.services.clipboard-sync = {
-		# Insert systemd config here
-		serviceConfig.ExecStart = "${self.packages.${pkgs.system}.default}/bin/clipboard-sync";
+		description = "Synchronize clipboards across all displays";
+		documentation = "https://github.com/dnut/clipboard-sync/";
+		wantedBy = [ "graphical-session.target" ];
+		after = [ "graphical-session.target" ];
+		partOf = [ "graphical-session.target" ];
+		requisite = [ "graphical-session.target" ];
+		serviceConfig.ExecStart = "/usr/bin/env ${self.packages.${pkgs.system}.default}/bin/clipboard-sync --hide-timestamp --log-level debug";
+		serviceConfig.Restart = "on-failure";
               };
             };
 	  };
