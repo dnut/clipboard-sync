@@ -1,5 +1,6 @@
 # compiled files and executables
 /target/
+/result/
 
 # distributable packages
 /dist/
