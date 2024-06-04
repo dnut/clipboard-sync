@@ -23,7 +23,7 @@
             config = lib.mkIf config.services.clipboard-sync.enable {
               systemd.services.clipboard-sync = {
 		# Insert systemd config here
-		serviceConfig.ExecStart = "${self.packages.${pkgs.system}.default}/bin/main";
+		serviceConfig.ExecStart = "${self.packages.${pkgs.system}.default}/bin/clipboard-sync";
               };
             };
 	  };
