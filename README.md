@@ -80,7 +80,7 @@ make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
 ### NixOS
 Firstly add this repo to your flake inputs:
 ```nix
-clipboard-sync.url = "github:QuarterHeaven/clipboard-sync";
+clipboard-sync.url = "github:dnut/clipboard-sync";
 ```
 
 Then put `clipboard-sync.nixosModules.default` into flake modules.
