@@ -78,14 +78,14 @@ make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
 ```
 
 ### NixOS
-Firstly add this repo to your flake inputs:
+Add this repo to your flake inputs:
 ```nix
 clipboard-sync.url = "github:dnut/clipboard-sync";
 ```
 
-Then put `clipboard-sync.nixosModules.default` into flake modules.
+Put `clipboard-sync.nixosModules.default` into flake modules.
 
-Finally, add `services.clipboard-sync.enable = true;` into the `configuration.nix`.
+To enable the systemd service, add `services.clipboard-sync.enable = true;` into the `configuration.nix`.
 
 # Usage
 The typical set-and-forget approach is to enable to service:
