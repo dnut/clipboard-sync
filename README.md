@@ -8,7 +8,7 @@ Example use cases:
 
 - **Improve Wayland compatibility**: You have already enabled support for wayland in your system, but your computer does not synchronize the clipboard between X11 and wayland windows. clipboard-sync can solve this problem. [more details](https://github.com/dnut/clipboard-sync/issues/9#issuecomment-1502368133)
 - **VNC**: You run a VNC server and would like all host and client logins from the same user to share the same clipboard.
-- **Multiple displays**: You run two or more desktop environments or window managers in separate ttys, switching between desktops using ctrl-alt-F*. 
+- **Multiple displays**: You run two or more desktop environments or window managers in separate ttys, switching between desktops using ctrl-alt-F*.
 - **Nested Wayland**: You run a wayland compositor within a window. examples:
   - you primarily use kde, but run sway in a window to consolidate all your messenger apps into a single tiled/tabbed window.
   - you use gnome and develop extensions for gnome, so you run a nested gnome environment for testing.
@@ -76,6 +76,16 @@ In addition to installing from the official repository, you can also build and i
 ```bash
 make deb && sudo apt install ./dist/deb/clipboard-sync_*.deb
 ```
+
+### NixOS
+Add this repo to your flake inputs:
+```nix
+clipboard-sync.url = "github:dnut/clipboard-sync";
+```
+
+Put `clipboard-sync.nixosModules.default` into flake modules.
+
+To enable the systemd service, add `services.clipboard-sync.enable = true;` into the `configuration.nix`.
 
 # Usage
 The typical set-and-forget approach is to enable to service:
