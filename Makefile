@@ -3,7 +3,7 @@ bin := "bin"
 systemd := "lib/systemd"
 user_unit_dir := "$(systemd)/user"
 profile := "release"
-version := $(shell grep '^version' Cargo.toml | sed 's/version = "(.*)"/\1/g')
+version := $(shell grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/g')
 deb_version := $(shell grep Version control | sed 's/Version: *//g')
 
 build:
