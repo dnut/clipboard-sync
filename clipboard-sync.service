@@ -3,7 +3,7 @@ Description=Synchronize clipboards across all displays
 Documentation=https://github.com/dnut/clipboard-sync/
 PartOf=graphical-session.target
 After=graphical-session.target
-Requisite=graphical-session.target
+Wants=graphical-session.target
 
 [Service]
 ExecStart=/usr/bin/env clipboard-sync --hide-timestamp --log-level debug
