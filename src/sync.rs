@@ -1,11 +1,13 @@
 use chrono::Local;
 use std::collections::HashSet;
-use std::{thread::sleep, time::Duration};
+use std::thread::sleep;
+use std::time::{Duration, Instant};
 use wayland_client::ConnectError;
-use wl_clipboard_rs::paste::Error as PasteError;
+
+use crate::wlr_backend::Error as WlrBackendError;
 
 use crate::clipboard::*;
-use crate::error::{MyError, MyResult, StandardizedError};
+use crate::error::{MyError, MyResult};
 use crate::log::{self, concise_numbers};
 
 pub fn get_clipboards() -> MyResult<Vec<Box<dyn Clipboard>>> {
@@ -62,11 +64,57 @@ pub fn keep_synced(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<()> {
     if clipboards.is_empty() {
         return Err(MyError::NoClipboards);
     }
+
+    let mut last: Vec<String> = clipboards
+        .iter()
+        .map(|c| c.get().unwrap_or_default())
+        .collect();
+    let mut settle_until: Option<Instant> = None;
+
     loop {
-        sleep(Duration::from_millis(100));
-        let new_value = await_change(clipboards)?;
-        for c in clipboards {
-            c.set(&new_value)?;
+        sleep(Duration::from_millis(200));
+
+        if let Some(deadline) = settle_until {
+            if Instant::now() < deadline {
+                continue;
+            }
+            for (j, c) in clipboards.iter().enumerate() {
+                if c.should_poll() {
+                    last[j] = c.get().unwrap_or_default();
+                }
+            }
+            settle_until = None;
+        }
+
+        for (i, c) in clipboards.iter().enumerate() {
+            if !c.should_poll() {
+                continue;
+            }
+            let current = c.get()?;
+            // Read glitches (wayland NoSeats/NoMimeType when the selection holds
+            // non-text data, X11 errors via unwrap_or_default) surface as "".
+            // Propagating one would wipe every synced clipboard.
+            if current.is_empty() || current == last[i] {
+                continue;
+            }
+
+            log::info!("clipboard updated from display {}", c.display());
+            log::sensitive!(log::info, "clipboard contents: '{}'", current);
+
+            for (j, other) in clipboards.iter().enumerate() {
+                if i == j {
+                    continue;
+                }
+                if last[j] != current {
+                    other.set(&current)?;
+                }
+                last[j] = current.clone();
+            }
+            last[i] = current;
+
+            // One poll interval for Wayland/X11 writes to settle before re-baselining.
+            settle_until = Some(Instant::now() + Duration::from_millis(200));
+            break;
         }
     }
 }
@@ -170,12 +218,9 @@ fn get_clipboards_spec<F: Fn(u8) -> MyResult<Option<Box<dyn Clipboard>>>>(
                     clipboards.push(clipboard);
                 }
             }
-            Err(MyError::TerminalClipboard(StandardizedError {
-                inner,
-                stdio: None,
-            })) if format!("{inner}") == "clipboard error: X11 clipboard error : XCB connection error: Connection" => {
+            Err(MyError::X11Clipboard(x11_clipboard::error::Error::XcbConn(err))) => {
                 xcb_conn_failed_clipboards.push(i);
-                xcb_conn_err = Some(inner);
+                xcb_conn_err = Some(err);
             },
             Err(err) => log::error!(
                 "unexpected error while attempting to setup clipboard {}: {}",
@@ -198,41 +243,37 @@ Details: '{err}' for x11 displays: {displays}",
 
 fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     let wl_display = format!("wayland-{}", n);
-    let clipboard = WlrClipboard {
-        display: wl_display.clone(),
-    };
-    let attempt = clipboard.get();
-    if let Err(MyError::WlcrsPaste(PasteError::WaylandConnection(
-        ConnectError::NoCompositorListening,
-    ))) = attempt
-    {
-        return Ok(None);
+    match WlrClipboard::new(wl_display.clone()) {
+        Ok(clipboard) => Ok(Some(Box::new(clipboard))),
+        Err(MyError::WlrBackend(WlrBackendError::WaylandConnection(
+            ConnectError::NoCompositor,
+        )))
+        | Err(MyError::WlrBackend(WlrBackendError::SocketOpenError(_))) => Ok(None),
+        Err(MyError::WlrBackend(WlrBackendError::MissingProtocol { .. })) => {
+            log::warning!(
+                "{wl_display} does not support ext-data-control or wlr-data-control. If you are \
+running gnome in wayland, that's OK because it provides an x11 clipboard, which will be used \
+instead. Otherwise, `wl-copy` will be used to sync data *into* this clipboard, but it will not \
+be possible to read data *from* this clipboard into other clipboards."
+            );
+            let command = WlCommandClipboard {
+                display: wl_display.clone(),
+            };
+            let Ok(gotten) = command.get() else {
+                return Ok(None);
+            };
+            let Ok(_) = command.set(&gotten) else {
+                return Ok(None);
+            };
+            Ok(Some(Box::new(command)))
+        }
+        Err(err) => {
+            log::error!(
+                "unexpected error while attempting to setup wayland clipboard {wl_display}: {err}"
+            );
+            Ok(None)
+        }
     }
-    if let Err(MyError::WlcrsPaste(PasteError::MissingProtocol {
-        name: "zwlr_data_control_manager_v1",
-        version: 1,
-    })) = attempt
-    {
-        log::warning!(
-            "{wl_display} does not support zwlr_data_control_manager_v1. If you are running \
-gnome in wayland, that's OK because it provides an x11 clipboard, which will be used instead. \
-Otherwise, `wl-copy` will be used to sync data *into* this clipboard, but it will not be possible \
-to read data *from* this clipboard into other clipboards."
-        );
-        let command = WlCommandClipboard {
-            display: wl_display.clone(),
-        };
-        let Ok(gotten) = command.get() else {
-            return Ok(None);
-        };
-        let Ok(_) = command.set(&gotten) else {
-            return Ok(None);
-        };
-        return Ok(Some(Box::new(command)));
-    }
-    attempt?;
-
-    Ok(Some(Box::new(clipboard)))
 }
 
 fn get_x11(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
@@ -243,20 +284,3 @@ fn get_x11(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     Ok(Some(Box::new(clipboard)))
 }
 
-fn await_change(clipboards: &Vec<Box<dyn Clipboard>>) -> MyResult<String> {
-    let start = clipboards[0].get()?;
-    loop {
-        for c in clipboards {
-            if !c.should_poll() {
-                continue;
-            }
-            let new = c.get()?;
-            if new != start {
-                log::info!("clipboard updated from display {}", c.display());
-                log::sensitive!(log::info, "clipboard contents: '{}'", new);
-                return Ok(new);
-            }
-        }
-        sleep(Duration::from_millis(200));
-    }
-}

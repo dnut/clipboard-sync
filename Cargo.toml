@@ -11,8 +11,8 @@ backtrace = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wayland-client = "0.29.4"
-wl-clipboard-rs = "0.7.0"
+wayland-client = "0.31.14"
+wl-clipboard-rs = "0.9.3"
 cli-clipboard = "0.2.0"
 arboard = "2.0.0"
 x11-clipboard = "0.5.3"
@@ -24,3 +24,7 @@ chrono = "0.4"
 itertools = "0.10"
 gag = "1.0"
 clap = { version = "4.0.29", features = ["derive", "wrap_help"] }
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+os_pipe = "1.2"
+rustix = { version = "1", features = ["fs"] }

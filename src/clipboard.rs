@@ -1,13 +1,12 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::{env, io::Read, process::Command};
-use terminal_clipboard::Clipboard as TerminalClipboard;
-use wl_clipboard_rs::copy::{MimeType as CopyMimeType, Options, Source};
-use wl_clipboard_rs::paste::{
-    get_contents, ClipboardType, Error as PasteError, MimeType as PasteMimeType, Seat,
-};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use std::{env, process::Command, thread};
 
-use crate::error::{Generify, MyResult, Standardize};
+use chrono::Local;
+
+use crate::error::MyResult;
+use crate::log;
+use crate::wlr_backend::WlrBackend;
 
 pub trait Clipboard: std::fmt::Debug {
     fn display(&self) -> String;
@@ -47,9 +46,27 @@ impl<T: Clipboard> Clipboard for Box<T> {
     }
 }
 
-#[derive(Debug)]
 pub struct WlrClipboard {
     pub display: String,
+    backend: WlrBackend,
+}
+
+impl std::fmt::Debug for WlrClipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WlrClipboard")
+            .field("display", &self.display)
+            .finish()
+    }
+}
+
+impl WlrClipboard {
+    pub fn new(display: String) -> MyResult<Self> {
+        env::set_var("WAYLAND_DISPLAY", &display);
+        Ok(Self {
+            backend: WlrBackend::new(&display)?,
+            display,
+        })
+    }
 }
 
 impl Clipboard for WlrClipboard {
@@ -58,39 +75,11 @@ impl Clipboard for WlrClipboard {
     }
 
     fn get(&self) -> MyResult<String> {
-        env::set_var("WAYLAND_DISPLAY", self.display.clone());
-        let result = get_contents(
-            ClipboardType::Regular,
-            Seat::Unspecified,
-            PasteMimeType::Text,
-        );
-
-        match result {
-            Ok((mut pipe, _)) => {
-                let mut contents = vec![];
-                pipe.read_to_end(&mut contents)?;
-                Ok(String::from_utf8_lossy(&contents).to_string())
-            }
-
-            Err(PasteError::NoSeats)
-            | Err(PasteError::ClipboardEmpty)
-            | Err(PasteError::NoMimeType) => Ok("".to_string()),
-
-            Err(err) => Err(err)?,
-        }
+        self.backend.get_text_or_empty()
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
-        env::set_var("WAYLAND_DISPLAY", self.display.clone());
-        let opts = Options::new();
-        let result = std::panic::catch_unwind(|| {
-            opts.copy(
-                Source::Bytes(value.to_string().into_bytes().into()),
-                CopyMimeType::Text,
-            )
-        });
-
-        Ok(result.standardize().generify()??)
+        self.backend.set_text_result(value)
     }
 
     fn rank(&self) -> u8 {
@@ -160,21 +149,8 @@ impl Clipboard for ArClipboard {
 
 pub struct X11Clipboard {
     display: String,
-    backend: X11Backend,
-}
-
-#[derive(Clone)]
-pub struct X11Backend(Rc<RefCell<terminal_clipboard::X11Clipboard>>);
-impl X11Backend {
-    /// try to only call this once because repeated initializations may not work.
-    /// i started seeing timeouts/errors after 4
-    pub fn new(display: &str) -> MyResult<Self> {
-        // let backend = stdio! { terminal_clipboard::X11Clipboard::new() }.standardize()?;
-        env::set_var("DISPLAY", display);
-        let backend = terminal_clipboard::X11Clipboard::new().standardize()?;
-
-        Ok(Self(Rc::new(RefCell::new(backend))))
-    }
+    setter: x11_clipboard::Clipboard,
+    cache: Arc<Mutex<String>>,
 }
 
 impl std::fmt::Debug for X11Clipboard {
@@ -185,17 +161,59 @@ impl std::fmt::Debug for X11Clipboard {
     }
 }
 
+/// Bound on a single X11 read, used both for the startup seed and by the
+/// watcher thread. Slow INCR transfers must not block reads indefinitely.
+const X11_READ_TIMEOUT: Duration = Duration::from_secs(30);
+
 impl X11Clipboard {
     pub fn new(display: String) -> MyResult<Self> {
+        env::set_var("DISPLAY", &display);
+        let setter = x11_clipboard::Clipboard::new()?;
+        let watcher = x11_clipboard::Clipboard::new()?;
+
+        let atoms = &watcher.getter.atoms;
+        let initial = watcher
+            .load(
+                atoms.clipboard,
+                atoms.utf8_string,
+                atoms.property,
+                X11_READ_TIMEOUT,
+            )
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .unwrap_or_default();
+
+        let cache = Arc::new(Mutex::new(initial));
+        thread::spawn({
+            let cache = cache.clone();
+            move || watch_x11(watcher, cache)
+        });
+
         Ok(Self {
-            backend: X11Backend::new(&display)?,
             display,
+            setter,
+            cache,
         })
     }
+}
 
-    // fn backend(&self) -> X11Backend {
-    //     X11Backend::new_str(&self.display).unwrap()
-    // }
+/// Polls the X11 clipboard in a dedicated thread so the main loop never blocks
+/// on a transfer. Selection owners that proxy clipboard data from another
+/// machine serve INCR transfers slowly; done synchronously in the poll loop,
+/// that starves Wayland event dispatch and pastes from Wayland apps time out.
+/// The XFixes-driven load_wait is not used: it has no read timeout, and rapid
+/// ownership changes (our own set racing another client re-taking the
+/// selection) make its shared-property conversions stomp each other — a stuck
+/// transfer would freeze this watcher silently. Bounded reads retry, so no
+/// change is ever lost.
+fn watch_x11(cb: x11_clipboard::Clipboard, cache: Arc<Mutex<String>>) {
+    let atoms = &cb.getter.atoms;
+    loop {
+        match cb.load(atoms.clipboard, atoms.utf8_string, atoms.property, X11_READ_TIMEOUT) {
+            Ok(bytes) => *cache.lock().unwrap() = String::from_utf8_lossy(&bytes).into_owned(),
+            Err(e) => log::debug!("X11 clipboard watch error: {e}"),
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
 }
 
 impl Clipboard for X11Clipboard {
@@ -204,21 +222,12 @@ impl Clipboard for X11Clipboard {
     }
 
     fn get(&self) -> MyResult<String> {
-        Ok(self
-            .backend
-            .0
-            .try_borrow()?
-            .get_string()
-            .unwrap_or_default())
+        Ok(self.cache.lock().unwrap().clone())
     }
 
     fn set(&self, value: &str) -> MyResult<()> {
-        self.backend
-            .0
-            .try_borrow_mut()?
-            .set_string(value)
-            .standardize()?;
-
+        let atoms = &self.setter.setter.atoms;
+        self.setter.store(atoms.clipboard, atoms.utf8_string, value)?;
         Ok(())
     }
 }
