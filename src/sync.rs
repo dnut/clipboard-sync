@@ -203,7 +203,7 @@ fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     };
     let attempt = clipboard.get();
     if let Err(MyError::WlcrsPaste(PasteError::WaylandConnection(
-        ConnectError::NoCompositorListening,
+        ConnectError::NoCompositor,
     ))) = attempt
     {
         return Ok(None);
@@ -214,10 +214,10 @@ fn get_wayland(n: u8) -> MyResult<Option<Box<dyn Clipboard>>> {
     })) = attempt
     {
         log::warning!(
-            "{wl_display} does not support zwlr_data_control_manager_v1. If you are running \
-gnome in wayland, that's OK because it provides an x11 clipboard, which will be used instead. \
-Otherwise, `wl-copy` will be used to sync data *into* this clipboard, but it will not be possible \
-to read data *from* this clipboard into other clipboards."
+            "{wl_display} does not support ext-data-control-v1 or wlr-data-control-unstable-v1. \
+If you are running Gnome in Wayland session, that's OK because it provides an x11 clipboard, \
+which will be used instead. Otherwise, `wl-copy` will be used to sync data *into* this clipboard, \
+but it will not be possible to read data *from* this clipboard into other clipboards."
         );
         let command = WlCommandClipboard {
             display: wl_display.clone(),
