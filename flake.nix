@@ -38,7 +38,7 @@
               partOf = [ "graphical-session.target" ];
               requisite = [ "graphical-session.target" ];
               serviceConfig.ExecStart = "/usr/bin/env ${
-                self.packages.${pkgs.system}.default
+                self.packages.${pkgs.stdenv.hostPlatform.system}.default
               }/bin/clipboard-sync --hide-timestamp --log-level debug";
               serviceConfig.Restart = "on-failure";
             };
