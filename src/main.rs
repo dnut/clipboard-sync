@@ -17,6 +17,7 @@ mod error;
 mod log;
 mod mustatex;
 mod sync;
+mod wlr_backend;
 
 fn main() {
     let args = Args::parse();
